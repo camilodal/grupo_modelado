@@ -32,7 +32,7 @@ Vamos a realizar las siguientes operaciones, para seleccionar un conjunto de dat
 """
 
 # ╔═╡ 2ab6f43e-f61b-4d88-b2c1-483fdf2b403a
-md"""md
+md"""
 !!! a
 	Cargamos los datos """
 
@@ -165,6 +165,32 @@ donde $N$ es la cantidad total de individuos de la población. Al haber normaliz
 Se recomienda plantear el modelo y resolverlo para datos iniciales de la forma $S_0 = 1-\varepsilon$, $I_0=\varepsilon$ y $R_0= 0$, similares a los que corresponderían al inicio de un brote. Fijando un valor de $\sigma$, mover $\beta$. Luego, fijando $\beta$, mover $\sigma$. En cada caso, analizar el efecto de estos parámetros en la evolución del brote."""
 
 
+# ╔═╡ ebe1d879-8ac6-450f-8ea1-13805aba98db
+function sir!(du,u,p,t)
+	β, σ = p
+	S, I, R = u
+	N = I + S + R
+	du[1] = - β * (S*I/N)
+	du[2] = β * (S*I/N) - σ * I
+	du[3] = σ * I
+	return du
+end;
+
+# ╔═╡ 247e11a4-2687-4ded-a8e4-ba6726c33a53
+begin 
+	params =[0.4, 0.2]
+	u₀ =  [0.2, 0.8, 0]
+	ts = (0., 100.)
+	comp_prob = ODEProblem(sir!, u₀, ts, params)
+end
+	
+
+# ╔═╡ 3ba50aa4-d276-4813-a8aa-18c67c425164
+sol_comp = solve(comp_prob)
+
+# ╔═╡ 33884a42-0668-4288-978b-0d3162a2cad9
+plot(sol_comp)
+
 # ╔═╡ b96e4d23-c011-407b-92c2-1d2f8133460b
 md"""## Modelo SEIR
 
@@ -178,11 +204,64 @@ $$\left\{\begin{array}{rcl}
 \end{array}\right.$$ 
 """
 
+# ╔═╡ d7112e6d-9b66-4764-bd95-292c68331bc9
+function seir!(du, u,p,t)
+	β, σ, γ = p
+	S, E, I, R = u
+	N = I + S + R + E
+	du[1] = - β * (S*I/N)
+	du[2] = β * (S*I/N) - σ * E
+	du[3] = γ * E - σ * I 
+	du[4] = σ * I
+	return du
+end;
+
+# ╔═╡ 3977ee72-7979-4fba-8455-35560d288bfc
+begin 
+	params_seir =[0.4,0.3,  0.2]
+	u₀_seir =  [0.2, 0.8, 0.1, 0]
+	ts_seir = (0., 100.)
+	comp_prob_seir = ODEProblem(seir!, u₀_seir, ts_seir, params_seir)
+end
+	
+
+# ╔═╡ a59669b9-29a7-414b-a8e4-660eb39b5a80
+sol_comp_seir = solve(comp_prob_seir)
+
+# ╔═╡ 6990ed25-baa8-4d50-ace3-61cdbd5ed08a
+plot(sol_comp_seir)
+
 # ╔═╡ ec272190-8008-4d4b-916b-dc355fbce8eb
 md""" ### Modelo SEIRS
 
 El modelo SEIRS es esencialmente igual al modelo SEIR pero incluye el retorno de los _recuperados_ a la categoría de susceptibles, luego de un cierto tiempo. Esto implica el agregado de un término $\delta R$, restando en $\dot{R}$ y sumando en $\dot{S}$. 
 El hecho de que los recuperados puedan volver a infectarse hace que el modelo SEIRS, a diferencia de los anteriores, permita generar dinámicas con más de una ola. """
+
+# ╔═╡ e4056557-d1e7-476f-ac57-4a8855dd734f
+function seirs!(du,u,p,t)
+	β, σ, γ, δ= p
+	S, E, I, R = u
+	N = I + S + R + E
+	du[1] = - β * (S*I/N) + δ * R
+	du[2] = β * (S*I/N) - σ * E
+	du[3] = γ * E - σ * I 
+	du[4] = σ * I - δ * R
+	return du
+end;
+
+# ╔═╡ ee00044c-366e-415e-abe7-053ba3ff5f3f
+begin 
+	params_seirs =[0.4, 0.3,  0.2, 0.1]
+	u₀_seirs =  [0.2, 0.8, 0.1, 0]
+	ts_seirs = (0., 100.)
+	comp_prob_seirs = ODEProblem(seirs!, u₀_seirs, ts_seirs, params_seirs)
+end
+
+# ╔═╡ 5be40bb2-933b-4491-b33e-c00ffa6c7fc1
+sol_comp_seirs = solve(comp_prob_seirs)
+
+# ╔═╡ dfe9a4e9-30d1-4cc7-a094-a43689ccfade
+plot(sol_comp_seirs)
 
 # ╔═╡ 07ca02cf-9f0d-46e2-9219-d1e0e78a87ba
 md""" ### La función a minimizar
@@ -2511,12 +2590,12 @@ version = "1.4.1+0"
 # ╟─2ab6f43e-f61b-4d88-b2c1-483fdf2b403a
 # ╠═6c10386c-3dcb-42d8-b834-85e70fb2b3eb
 # ╟─63519966-7988-4a88-a47b-9996e6372452
-# ╟─48377b47-ee1f-4dd4-94a0-195ae9f3e4e1
-# ╟─c9f88c86-3b56-4302-9da7-eab9e28ae26a
-# ╟─5f6ed769-c991-4d56-922c-ab151bbc371c
+# ╠═48377b47-ee1f-4dd4-94a0-195ae9f3e4e1
+# ╠═c9f88c86-3b56-4302-9da7-eab9e28ae26a
+# ╠═5f6ed769-c991-4d56-922c-ab151bbc371c
 # ╟─bcaacec3-27c2-4654-8b0d-9d17609b5f33
 # ╟─17876edb-8222-42e1-9f18-7733637e36aa
-# ╟─b9597c6f-5c0f-4a5b-9ac4-e5e615b2bdc9
+# ╠═b9597c6f-5c0f-4a5b-9ac4-e5e615b2bdc9
 # ╟─75faea2a-8409-415c-9157-82ab19752c68
 # ╟─13085296-7ee6-45d1-a6c3-77a6fb506f6e
 # ╟─9f86409b-94a4-439e-8cc8-534a8053b070
@@ -2525,8 +2604,20 @@ version = "1.4.1+0"
 # ╟─83fc7482-8a46-4842-83cb-d05d6f6d67da
 # ╟─ddf46cb1-9f4a-43e7-820a-7722a865f0fe
 # ╟─7386a708-0bdc-4bec-8c3e-9c6b5f7d30a6
+# ╠═ebe1d879-8ac6-450f-8ea1-13805aba98db
+# ╠═247e11a4-2687-4ded-a8e4-ba6726c33a53
+# ╠═3ba50aa4-d276-4813-a8aa-18c67c425164
+# ╠═33884a42-0668-4288-978b-0d3162a2cad9
 # ╟─b96e4d23-c011-407b-92c2-1d2f8133460b
+# ╠═d7112e6d-9b66-4764-bd95-292c68331bc9
+# ╠═3977ee72-7979-4fba-8455-35560d288bfc
+# ╠═a59669b9-29a7-414b-a8e4-660eb39b5a80
+# ╠═6990ed25-baa8-4d50-ace3-61cdbd5ed08a
 # ╟─ec272190-8008-4d4b-916b-dc355fbce8eb
+# ╠═e4056557-d1e7-476f-ac57-4a8855dd734f
+# ╠═ee00044c-366e-415e-abe7-053ba3ff5f3f
+# ╠═5be40bb2-933b-4491-b33e-c00ffa6c7fc1
+# ╠═dfe9a4e9-30d1-4cc7-a094-a43689ccfade
 # ╟─07ca02cf-9f0d-46e2-9219-d1e0e78a87ba
 # ╟─7ac39268-0555-4906-bd84-e1d1185c7814
 # ╠═df275ce2-59f3-4e1a-aee2-5f6f3a0fed64
