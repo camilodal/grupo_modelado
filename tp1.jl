@@ -4,6 +4,16 @@
 using Markdown
 using InteractiveUtils
 
+# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
+macro bind(def, element)
+    quote
+        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
+        local el = $(esc(element))
+        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
+        el
+    end
+end
+
 # ╔═╡ e8d8fd8e-48ce-11ee-3acb-db987c0fd698
 using DataFrames, CSV, Plots, DifferentialEquations, Optimization, DiffEqParamEstim,OptimizationOptimJL, PlutoUI
 
@@ -44,11 +54,11 @@ begin
 	using Dates
 	filtro_argentina(Country::String) = Country == "Argentina"
 	# Filtrar el DataFrame utilizando la función de condición
-	condicion_fecha(fecha::Dates.Date)=fecha >= 	Dates.Date(2020, 2, 29)
+	condicion_fecha(fecha::Dates.Date)= fecha >= Dates.Date(2020, 2, 29)
 	datos_argentina = filter(:Country => filtro_argentina, datos)
 	datos_argentina = filter(:Date_reported => condicion_fecha, datos_argentina)
 
-	datos_argentina= select(datos_argentina, [:Date_reported, :New_cases, :Cumulative_cases, :New_deaths, :Cumulative_deaths])
+	datos_argentina = select(datos_argentina, [:Date_reported, :New_cases, :Cumulative_cases, :New_deaths, :Cumulative_deaths])
 	
 	# Agregamos una columna 'Week' que representa el primer día de cada semana.
 	datos_argentina.Week = Dates.firstdayofweek.(datos_argentina.Date_reported)
@@ -167,8 +177,8 @@ Se recomienda plantear el modelo y resolverlo para datos iniciales de la forma $
 
 # ╔═╡ ebe1d879-8ac6-450f-8ea1-13805aba98db
 function sir!(du,u,p,t)
-	β, σ = p
-	S, I, R = u
+	β,σ = p
+	S,I,R = u
 	N = I + S + R
 	du[1] = - β * (S*I/N)
 	du[2] = β * (S*I/N) - σ * I
@@ -176,20 +186,34 @@ function sir!(du,u,p,t)
 	return du
 end;
 
+# ╔═╡ 18d59ab4-34ad-45d6-8aac-757d15743c96
+md""" $\epsilon, \beta, \sigma$  en ese orden: """
+
+# ╔═╡ 5f48b2e2-b5e7-4684-a8f8-2684481dc430
+@bind ϵ Slider(0:0.01:1)
+
+# ╔═╡ c5ba5d5c-b8a5-4f2a-92ed-2514d4750654
+@bind β Slider(0:0.1:5)
+
+# ╔═╡ ce5f8609-f880-422b-9687-96a0b9aecb7f
+@bind σ Slider(0:0.1:5)
+
 # ╔═╡ 247e11a4-2687-4ded-a8e4-ba6726c33a53
 begin 
-	params =[0.4, 0.2]
-	u₀ =  [0.2, 0.8, 0]
+	S₀ = 1 - ϵ
+	I₀ = ϵ 
+	R₀ = 0
+	params = [β,σ]
+	u₀ =  [S₀,I₀,R₀]
 	ts = (0., 100.)
 	comp_prob = ODEProblem(sir!, u₀, ts, params)
 end
-	
-
-# ╔═╡ 3ba50aa4-d276-4813-a8aa-18c67c425164
-sol_comp = solve(comp_prob)
 
 # ╔═╡ 33884a42-0668-4288-978b-0d3162a2cad9
-plot(sol_comp)
+begin 
+	sol_comp = solve(comp_prob)
+	plot(sol_comp)
+end 
 
 # ╔═╡ b96e4d23-c011-407b-92c2-1d2f8133460b
 md"""## Modelo SEIR
@@ -293,8 +317,21 @@ En principio intentaremos ajustar sólo la primera ola de la epidemia, con cada 
 
 
 
-# ╔═╡ df275ce2-59f3-4e1a-aee2-5f6f3a0fed64
+# ╔═╡ da818aca-ce13-456c-ac7f-3eca53962c63
+begin
+	n = lenght(primera_ola.Week)
+	t = 1:n
+	prob = ODEProblem(sir!,[S₀,I₀,R₀],(0.,100.),abstol=1e-14,reltol=1e-10)
+	func = build_loss_objective(prob,AutoTsit5(Rosenbrock23()),L2Loss(t,primera_ola.))
+end;
 
+# ╔═╡ 128683cf-9f9d-4343-963b-80c19b16dc63
+
+
+# ╔═╡ df275ce2-59f3-4e1a-aee2-5f6f3a0fed64
+function costo(sol,t_ola1,ola1,indice)
+	
+end
 
 # ╔═╡ 82c4e128-a488-4032-acaf-2b0549cea8f0
 md"""##### Datos Iniciales
@@ -2594,19 +2631,22 @@ version = "1.4.1+0"
 # ╠═c9f88c86-3b56-4302-9da7-eab9e28ae26a
 # ╠═5f6ed769-c991-4d56-922c-ab151bbc371c
 # ╟─bcaacec3-27c2-4654-8b0d-9d17609b5f33
-# ╟─17876edb-8222-42e1-9f18-7733637e36aa
-# ╠═b9597c6f-5c0f-4a5b-9ac4-e5e615b2bdc9
+# ╠═17876edb-8222-42e1-9f18-7733637e36aa
+# ╟─b9597c6f-5c0f-4a5b-9ac4-e5e615b2bdc9
 # ╟─75faea2a-8409-415c-9157-82ab19752c68
 # ╟─13085296-7ee6-45d1-a6c3-77a6fb506f6e
-# ╟─9f86409b-94a4-439e-8cc8-534a8053b070
-# ╟─7cbc0897-4f39-4a88-96cd-2b2d6e0b19ef
-# ╟─1a5b434d-1b47-419b-ae5e-6efd0b53409e
-# ╟─83fc7482-8a46-4842-83cb-d05d6f6d67da
+# ╠═9f86409b-94a4-439e-8cc8-534a8053b070
+# ╠═7cbc0897-4f39-4a88-96cd-2b2d6e0b19ef
+# ╠═1a5b434d-1b47-419b-ae5e-6efd0b53409e
+# ╠═83fc7482-8a46-4842-83cb-d05d6f6d67da
 # ╟─ddf46cb1-9f4a-43e7-820a-7722a865f0fe
 # ╟─7386a708-0bdc-4bec-8c3e-9c6b5f7d30a6
 # ╠═ebe1d879-8ac6-450f-8ea1-13805aba98db
-# ╠═247e11a4-2687-4ded-a8e4-ba6726c33a53
-# ╠═3ba50aa4-d276-4813-a8aa-18c67c425164
+# ╟─18d59ab4-34ad-45d6-8aac-757d15743c96
+# ╟─5f48b2e2-b5e7-4684-a8f8-2684481dc430
+# ╟─c5ba5d5c-b8a5-4f2a-92ed-2514d4750654
+# ╟─ce5f8609-f880-422b-9687-96a0b9aecb7f
+# ╟─247e11a4-2687-4ded-a8e4-ba6726c33a53
 # ╠═33884a42-0668-4288-978b-0d3162a2cad9
 # ╟─b96e4d23-c011-407b-92c2-1d2f8133460b
 # ╠═d7112e6d-9b66-4764-bd95-292c68331bc9
@@ -2620,6 +2660,8 @@ version = "1.4.1+0"
 # ╠═dfe9a4e9-30d1-4cc7-a094-a43689ccfade
 # ╟─07ca02cf-9f0d-46e2-9219-d1e0e78a87ba
 # ╟─7ac39268-0555-4906-bd84-e1d1185c7814
+# ╠═da818aca-ce13-456c-ac7f-3eca53962c63
+# ╠═128683cf-9f9d-4343-963b-80c19b16dc63
 # ╠═df275ce2-59f3-4e1a-aee2-5f6f3a0fed64
 # ╟─82c4e128-a488-4032-acaf-2b0549cea8f0
 # ╟─60ae80a6-2354-4c68-abd8-2cc2f839d4db
