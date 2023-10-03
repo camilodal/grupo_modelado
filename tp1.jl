@@ -314,24 +314,40 @@ En principio intentaremos ajustar sólo la primera ola de la epidemia, con cada 
 
 + Se recomienda utilizar el método `SAMIN()` al optimizar."""
 
-
-
-
 # ╔═╡ da818aca-ce13-456c-ac7f-3eca53962c63
 begin
-	S₁ = 0.8
-	I₁ = 0.2
+	S₁ = 0.9
+	I₁ = 0.1
 	R₁ = 0.0
+	data = transpose(hcat(1 .- primera_ola.New_cases,primera_ola.New_cases-primera_ola.New_deaths,primera_ola.New_deaths))
 	prob = ODEProblem(sir!,[S₁,I₁,R₁],(1.0,42.0))
-	func = build_loss_objective(prob,AutoTsit5(Rosenbrock23()),L2Loss(1:42,primera_ola.New_cases),Optimization.AutoFiniteDiff())
-	optprob = OptimizationProblem(func,0.1rand(2),lb=zeros(2),ub=ones(2))
-	parametros = solve(optprob,SAMIN(),maxiters=1000)
+	func = build_loss_objective(prob,
+								AutoTsit5(Rosenbrock23()),
+								L2Loss(1:42,data),
+								Optimization.AutoFiniteDiff())
+	optprob = OptimizationProblem(func,0.1rand(2),lb=zeros(2),ub=5ones(2))
+	p̄ = solve(optprob,SAMIN(),maxiters=100000)
 end;
 
 # ╔═╡ df275ce2-59f3-4e1a-aee2-5f6f3a0fed64
-function costo(sol,t_ola1,ola1,indice)
-	
-end
+begin 
+	function opt_model(model,datosᵢ,data,cantᵥ)
+		t₁  = size(data)[2]
+		prob = ODEProblem(model,datosᵢ,(1.0,t₁))
+		func = build_loss_objective(prob,
+								AutoTsit5(Rosenbrock23()),
+								L2Loss(1:t₁,data),
+								Optimization.AutoFiniteDiff())
+		optprob = OptimizationProblem(func,0.1rand(cantᵥ),lb=zeros(cantᵥ),ub=5ones(cantᵥ))
+		p̄ = solve(optprob,SAMIN(),maxiters=100000)
+		return p̄
+	end
+end;
+
+# ╔═╡ 3846c714-87f7-4517-acfb-814f259655e9
+begin 
+	println(opt_model(sir!,[S₁,I₁,R₁],data,2))
+end;
 
 # ╔═╡ 82c4e128-a488-4032-acaf-2b0549cea8f0
 md"""##### Datos Iniciales
@@ -2662,6 +2678,7 @@ version = "1.4.1+0"
 # ╟─7ac39268-0555-4906-bd84-e1d1185c7814
 # ╠═da818aca-ce13-456c-ac7f-3eca53962c63
 # ╠═df275ce2-59f3-4e1a-aee2-5f6f3a0fed64
+# ╠═3846c714-87f7-4517-acfb-814f259655e9
 # ╟─82c4e128-a488-4032-acaf-2b0549cea8f0
 # ╟─60ae80a6-2354-4c68-abd8-2cc2f839d4db
 # ╟─4e0aaf37-4150-4526-b0fe-707bd8d9602b
