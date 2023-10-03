@@ -67,9 +67,9 @@ begin
 	datos_argentina = combine(groupby(datos_argentina, :Week)) do subgrupo
 	    DataFrame(
 	        New_cases= sum(subgrupo.New_cases),
-	        Cumulative_cases = sum(subgrupo.Cumulative_cases),
+	        Cumulative_cases = maximum(subgrupo.Cumulative_cases),
 	        New_deaths = sum(subgrupo.New_deaths),
-	        Cumulative_deaths = sum(subgrupo.Cumulative_deaths)
+	        Cumulative_deaths = maximum(subgrupo.Cumulative_deaths)
 	    )
 	end
 end
@@ -319,14 +319,14 @@ En principio intentaremos ajustar sólo la primera ola de la epidemia, con cada 
 
 # ╔═╡ da818aca-ce13-456c-ac7f-3eca53962c63
 begin
-	n = lenght(primera_ola.Week)
-	t = 1:n
-	prob = ODEProblem(sir!,[S₀,I₀,R₀],(0.,100.),abstol=1e-14,reltol=1e-10)
-	func = build_loss_objective(prob,AutoTsit5(Rosenbrock23()),L2Loss(t,primera_ola.))
+	S₁ = 0.8
+	I₁ = 0.2
+	R₁ = 0.0
+	prob = ODEProblem(sir!,[S₁,I₁,R₁],(1.0,42.0))
+	func = build_loss_objective(prob,AutoTsit5(Rosenbrock23()),L2Loss(1:42,primera_ola.New_cases),Optimization.AutoFiniteDiff())
+	optprob = OptimizationProblem(func,0.1rand(2),lb=zeros(2),ub=ones(2))
+	parametros = solve(optprob,SAMIN(),maxiters=1000)
 end;
-
-# ╔═╡ 128683cf-9f9d-4343-963b-80c19b16dc63
-
 
 # ╔═╡ df275ce2-59f3-4e1a-aee2-5f6f3a0fed64
 function costo(sol,t_ola1,ola1,indice)
@@ -2661,7 +2661,6 @@ version = "1.4.1+0"
 # ╟─07ca02cf-9f0d-46e2-9219-d1e0e78a87ba
 # ╟─7ac39268-0555-4906-bd84-e1d1185c7814
 # ╠═da818aca-ce13-456c-ac7f-3eca53962c63
-# ╠═128683cf-9f9d-4343-963b-80c19b16dc63
 # ╠═df275ce2-59f3-4e1a-aee2-5f6f3a0fed64
 # ╟─82c4e128-a488-4032-acaf-2b0549cea8f0
 # ╟─60ae80a6-2354-4c68-abd8-2cc2f839d4db
