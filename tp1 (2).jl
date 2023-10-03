@@ -360,18 +360,24 @@ md"""
 
 # ╔═╡ 82914ffa-5c25-4b6f-b362-d65c2cb9e6ef
 begin
-	p0vi = [0.8, 0.2,0,0.1, 0.1]
+	p0vi = [0.8, 0.2,0,0.4, 0.3]
 	func₃    = build_loss_objective(prob,
 									AutoTsit5(Rosenbrock23()),
 									L2Loss(1:42,primera_ola.New_cases),
 									Optimization.AutoFiniteDiff(),
 						prob_generator = (prob,q)->remake(prob,u0=q[1:3],p=q[4:5]))
-	optprob₃ = OptimizationProblem(func₃,p0vi,lb=zeros(5),ub=[1, 1,1,0.5,0.5])
-	p̄₃       = solve(optprob₃,SAMIN(),maxiters=1000)
+	optprob₃ = OptimizationProblem(func₃,p0vi,lb=zeros(5),ub=[1, 1,1,1.2,1.2])
+	p̄₃       = solve(optprob₃,SAMIN(),maxiters=100000)
 end
 
 # ╔═╡ 7d53926e-d2dc-4771-a492-68b6db254ca5
-
+begin
+	optsol₃  = solve(remake(prob,u0=p̄₃[1:3],p=p̄₃[4:5]))
+	#sol₀    = solve(remake(prob,p=[0.025,0.001,0.02,0.002]))
+	plot(optsol₃)
+	#plot!(sol₀)
+	#scatter!(primera_ola.New_cases)
+end
 
 # ╔═╡ df275ce2-59f3-4e1a-aee2-5f6f3a0fed64
 function costo(sol,t_ola1,ola1,indice)
