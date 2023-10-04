@@ -1,0 +1,14 @@
+	function getβSIsir(sol,n)
+		res = zeros(n)
+		for i in 1:n
+			res[i] = sol.(i,idxs=1) * sol.(i,idxs=2) * sol.prob.p[1]
+		end
+		return res
+	end 
+	function getγEseirS(sol,n)
+		res = zeros(n)
+		for i in 1:n
+			res[i] = sol.(i,idxs=2)*sol.prob.p[3]
+		end
+		return res
+	end
