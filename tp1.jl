@@ -95,10 +95,10 @@ md"""
 # ╔═╡ 17876edb-8222-42e1-9f18-7733637e36aa
 begin
 	cant_hab= 45500000
-	datos_argentina.New_cases.=100 * datos_argentina.New_cases / cant_hab
-	datos_argentina.Cumulative_cases.=100 * datos_argentina.Cumulative_cases / cant_hab
-	datos_argentina.New_deaths.=100 * datos_argentina.New_deaths / cant_hab
-	datos_argentina.Cumulative_deaths.=100 * datos_argentina.Cumulative_deaths / cant_hab
+	datos_argentina.New_cases= datos_argentina.New_cases / cant_hab
+	datos_argentina.Cumulative_cases=datos_argentina.Cumulative_cases / cant_hab
+	datos_argentina.New_deaths=datos_argentina.New_deaths / cant_hab
+	datos_argentina.Cumulative_deaths=datos_argentina.Cumulative_deaths / cant_hab
 	datos_argentina
 end;
 
@@ -180,8 +180,8 @@ function sir!(du,u,p,t)
 	β,σ = p
 	S,I,R = u
 	N = I + S + R
-	du[1] = - β * (S*I/N)
-	du[2] = β * (S*I/N) - σ * I
+	du[1] = - β * (S*I)#/N)
+	du[2] = β * (S*I) - σ * I
 	du[3] = σ * I
 	return du
 end;
@@ -314,6 +314,11 @@ En principio intentaremos ajustar sólo la primera ola de la epidemia, con cada 
 
 + Se recomienda utilizar el método `SAMIN()` al optimizar."""
 
+# ╔═╡ 21bdbd77-e83f-4395-b03d-5f9ede28f413
+md""" 
+	!!! a
+		Modelo SIR"""
+
 # ╔═╡ da818aca-ce13-456c-ac7f-3eca53962c63
 begin 
 	function getNIsir(sol,n)
@@ -322,34 +327,96 @@ begin
 			nI[i] = sol.(i,idxs=1) * sol.(i,idxs=2) * sol.prob.p[1]
 		end
 		return nI
-	end 
+	end
+
+	
 	function func(x,r)
 		tot_loss = 0.0
 		n = length(primera_ola.New_cases)
-		prob     = ODEProblem(sir!,x[1:3],(1,n),x[4:5])
+		datos_iniciales=[1-x[1], x[1], 0]
+		parametros = x[2:3]
+		prob     = ODEProblem(sir!,datos_iniciales,(1,n),parametros)#,bstol=1e-7, reltol=1e-7)
 		sol      = solve(prob,Vern7())
-    if any((!SciMLBase.successful_retcode(s.retcode) for s in sol)) # 
-        tot_loss = Inf
-    else
-		sol_eval = getNIsir(sol,n)
-		tot_loss = sum((sol_eval - primera_ola.New_cases))
-	end
-		return tot_loss
-	end
+	    if any((!SciMLBase.successful_retcode(s.retcode) for s in sol)) # 
+	        tot_loss = Inf
+	    else
+			sol_eval = getNIsir(sol,n)
+			for i in 1:n
+				tot_loss += (sol_eval[i]-primera_ola.New_cases[i])^2
+			end			
+		end
+			return tot_loss
+		end
+	
 end;
 
+
 # ╔═╡ df275ce2-59f3-4e1a-aee2-5f6f3a0fed64
-optprob = OptimizationProblem(func,[0.9,0.1,0,0.1,0.1],lb=zeros(5),ub=[1,1,1,1,1])
+optprob = OptimizationProblem(func,[1e-7,0.19, 0.15],lb=[0, 0, 0],ub=[1, 0.2, 0.2])
 
 # ╔═╡ 17a2c84a-b3b0-4d4a-918b-050e20d74d81
-p̄ = solve(optprob,SAMIN(),maxiters=100000)
+
+p̄ = solve(optprob,SAMIN(),maxiters=10000000)
+
 
 # ╔═╡ ffb9dd25-84a8-4be9-ad42-8b8bac905256
 begin
-	prob_final = ODEProblem(sir!,p̄[1:3],(1,42),p̄[4:5])
+	n = length(primera_ola.New_cases)
+	datos_in = [1-p̄[1], p̄[1], 0]
+	prob_final = ODEProblem(sir!,datos_in,(1,42),p̄[2:3])
 	sol_opt    = solve(prob_final,Vern7())
-	plot(sol_opt)
-	scatter!(1:42,primera_ola.New_cases)
+	plot([1:42], getNIsir(sol_opt, n))
+	scatter!([1:42],primera_ola.New_cases)
+end
+
+# ╔═╡ 3b4e15a8-b87f-4bd2-9456-79ffee764641
+md"""
+	!!! b
+		Modelo SEIR"""
+
+# ╔═╡ 95edd622-53bc-43f1-a8f8-ac4ca74ea860
+function getγEseirS(sol,n)
+		res = zeros(n)
+		for i in 1:n
+			res[i] = sol.(i,idxs=2)*sol.prob.p[3]
+		end
+	return res
+end
+
+# ╔═╡ 173cc445-7de6-4ca1-8515-3796bce6b1f8
+function func_seir(x,r)
+		tot_loss = 0.0
+		n = length(primera_ola.New_cases)
+		datos_iniciales=[x[1], x[2]*(1-x[1]), 1-x[1]-x[2]*(1-x[1]), 0]
+		parametros = x[3:5]
+		prob     = ODEProblem(seir!,datos_iniciales,(1,n),parametros)#,bstol=1e-7, reltol=1e-7)
+		sol      = solve(prob,Vern7())
+	    if any((!SciMLBase.successful_retcode(s.retcode) for s in sol)) # 
+	        tot_loss = Inf
+	    else
+			sol_eval = getγEseirS(sol,n)
+			for i in 1:n
+				tot_loss += (sol_eval[i]-primera_ola.New_cases[i])^2
+			end			
+		end
+			return tot_loss
+end
+	
+
+# ╔═╡ f79362e7-0401-4aaa-9c33-b5a1be4d62da
+optprob_seir = OptimizationProblem(func_seir,[1e-7,0.19, 0.1, 0.15, 0.1],lb=[0, 0, 0, 0, 0],ub=[1, 1, 0.2, 0.2, 0.2])
+
+# ╔═╡ 558b3d9f-f59b-4eb7-9b08-560cc31deacc
+p_seir = solve(optprob_seir,SAMIN(),maxiters=100000)
+
+
+# ╔═╡ 0750cba0-b4f7-43dc-afad-33ac50f9ca1c
+begin
+	datos_iniciales_seir=[p_seir[1], p_seir[2]*(1-p_seir[1]), 1-p_seir[1]-p_seir[2]*(1-p_seir[1]), 0]
+	prob_final_seir = ODEProblem(seir!,p_seir,(1,42),p_seir[3:5])
+	sol_opt_seir    = solve(prob_final_seir,Vern7())
+	plot([1:42], getγEseirS(sol_opt_seir, n))
+	scatter!([1:42],primera_ola.New_cases)
 end
 
 # ╔═╡ 82c4e128-a488-4032-acaf-2b0549cea8f0
@@ -2390,9 +2457,9 @@ version = "3.5.0+0"
 
 [[deps.xkbcommon_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Wayland_jll", "Wayland_protocols_jll", "Xorg_libxcb_jll", "Xorg_xkeyboard_config_jll"]
-git-tree-sha1 = "9ebfc140cc56e8c2156a15ceac2f0302e327ac0a"
+git-tree-sha1 = "9c304562909ab2bab0262639bd4f444d7bc2be37"
 uuid = "d8fb68d0-12a3-5cfd-a85a-d49703b185fd"
-version = "1.4.1+0"
+version = "1.4.1+1"
 """
 
 # ╔═╡ Cell order:
@@ -2436,10 +2503,17 @@ version = "1.4.1+0"
 # ╠═dfe9a4e9-30d1-4cc7-a094-a43689ccfade
 # ╟─07ca02cf-9f0d-46e2-9219-d1e0e78a87ba
 # ╟─7ac39268-0555-4906-bd84-e1d1185c7814
+# ╟─21bdbd77-e83f-4395-b03d-5f9ede28f413
 # ╠═da818aca-ce13-456c-ac7f-3eca53962c63
 # ╠═df275ce2-59f3-4e1a-aee2-5f6f3a0fed64
 # ╠═17a2c84a-b3b0-4d4a-918b-050e20d74d81
 # ╠═ffb9dd25-84a8-4be9-ad42-8b8bac905256
+# ╟─3b4e15a8-b87f-4bd2-9456-79ffee764641
+# ╠═95edd622-53bc-43f1-a8f8-ac4ca74ea860
+# ╠═173cc445-7de6-4ca1-8515-3796bce6b1f8
+# ╠═f79362e7-0401-4aaa-9c33-b5a1be4d62da
+# ╠═558b3d9f-f59b-4eb7-9b08-560cc31deacc
+# ╠═0750cba0-b4f7-43dc-afad-33ac50f9ca1c
 # ╟─82c4e128-a488-4032-acaf-2b0549cea8f0
 # ╟─60ae80a6-2354-4c68-abd8-2cc2f839d4db
 # ╟─4e0aaf37-4150-4526-b0fe-707bd8d9602b
