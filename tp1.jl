@@ -383,6 +383,9 @@ function getγEseirS(sol,n)
 	return res
 end
 
+# ╔═╡ 9090e0cb-6694-4596-8c30-0d696a9ea90e
+
+
 # ╔═╡ 173cc445-7de6-4ca1-8515-3796bce6b1f8
 function func_seir(x,r)
 		tot_loss = 0.0
@@ -404,7 +407,7 @@ end
 	
 
 # ╔═╡ f79362e7-0401-4aaa-9c33-b5a1be4d62da
-optprob_seir = OptimizationProblem(func_seir,[1e-7,0.19, 0.1, 0.15, 0.1],lb=[0, 0, 0, 0, 0],ub=[1, 1, 0.2, 0.2, 0.2])
+optprob_seir = OptimizationProblem(func_seir,[0.73,0.19, 0.1, 0.15, 0.1],lb=[0, 0, 0, 0, 0],ub=[1, 1, 0.9, 0.9, 0.9])
 
 # ╔═╡ 558b3d9f-f59b-4eb7-9b08-560cc31deacc
 p_seir = solve(optprob_seir,SAMIN(),maxiters=100000)
@@ -415,6 +418,46 @@ begin
 	datos_iniciales_seir=[p_seir[1], p_seir[2]*(1-p_seir[1]), 1-p_seir[1]-p_seir[2]*(1-p_seir[1]), 0]
 	prob_final_seir = ODEProblem(seir!,p_seir,(1,42),p_seir[3:5])
 	sol_opt_seir    = solve(prob_final_seir,Vern7())
+	plot([1:42], getγEseirS(sol_opt_seir, n))
+	scatter!([1:42],primera_ola.New_cases)
+end
+
+# ╔═╡ c8cab669-b51b-47ca-ad81-eef82b00a051
+md"""
+	!!! c
+		Modelo SEIRS"""
+
+# ╔═╡ ac52d23e-9392-40d4-a8fc-276f88fa0bf5
+function func_seirs(x,r)
+		tot_loss = 0.0
+		n = length(primera_ola.New_cases)
+		datos_iniciales=[x[1], x[2]*(1-x[1]), 1-x[1]-x[2]*(1-x[1]), 0]
+		parametros = x[3:6]
+		prob     = ODEProblem(seirs!,datos_iniciales,(1,n),parametros)#,bstol=1e-7, reltol=1e-7)
+		sol      = solve(prob,Vern7())
+	    if any((!SciMLBase.successful_retcode(s.retcode) for s in sol)) # 
+	        tot_loss = Inf
+	    else
+			sol_eval = getγEseirS(sol,n)
+			for i in 1:n
+				tot_loss += (sol_eval[i]-primera_ola.New_cases[i])^2
+			end			
+		end
+			return tot_loss
+end
+
+# ╔═╡ eb3ef726-69e8-414f-813a-a2d055377637
+optprob_seirs = OptimizationProblem(func_seirs,[0.73,0.19, 0.1, 0.15, 0.1, 0.2],lb=[0, 0, 0, 0, 0, 0], 0,ub=[1, 1, 0.9, 0.9, 0.9, 0.9])
+
+# ╔═╡ d7139c4f-18bf-405a-bbe9-78260ea81655
+p_seirs = solve(optprob_seirs,SAMIN(),maxiters=100000)
+
+
+# ╔═╡ 640d8ef6-f592-4f82-94e3-198e792f5110
+begin
+	datos_iniciales_seirs=[p_seirs[1], p_seirs[2]*(1-p_seirs[1]), 1-p_seirs[1]-p_seirs[2]*(1-p_seirs[1]), 0]
+	prob_final_seirs = ODEProblem(seirs!,p_seirs,(1,42),p_seirs[3:6])
+	sol_opt_seirs    = solve(prob_final_seirs,Vern7())
 	plot([1:42], getγEseirS(sol_opt_seir, n))
 	scatter!([1:42],primera_ola.New_cases)
 end
@@ -2457,9 +2500,9 @@ version = "3.5.0+0"
 
 [[deps.xkbcommon_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Wayland_jll", "Wayland_protocols_jll", "Xorg_libxcb_jll", "Xorg_xkeyboard_config_jll"]
-git-tree-sha1 = "9c304562909ab2bab0262639bd4f444d7bc2be37"
+git-tree-sha1 = "9ebfc140cc56e8c2156a15ceac2f0302e327ac0a"
 uuid = "d8fb68d0-12a3-5cfd-a85a-d49703b185fd"
-version = "1.4.1+1"
+version = "1.4.1+0"
 """
 
 # ╔═╡ Cell order:
@@ -2510,10 +2553,16 @@ version = "1.4.1+1"
 # ╠═ffb9dd25-84a8-4be9-ad42-8b8bac905256
 # ╟─3b4e15a8-b87f-4bd2-9456-79ffee764641
 # ╠═95edd622-53bc-43f1-a8f8-ac4ca74ea860
+# ╠═9090e0cb-6694-4596-8c30-0d696a9ea90e
 # ╠═173cc445-7de6-4ca1-8515-3796bce6b1f8
 # ╠═f79362e7-0401-4aaa-9c33-b5a1be4d62da
 # ╠═558b3d9f-f59b-4eb7-9b08-560cc31deacc
 # ╠═0750cba0-b4f7-43dc-afad-33ac50f9ca1c
+# ╟─c8cab669-b51b-47ca-ad81-eef82b00a051
+# ╠═ac52d23e-9392-40d4-a8fc-276f88fa0bf5
+# ╠═eb3ef726-69e8-414f-813a-a2d055377637
+# ╠═d7139c4f-18bf-405a-bbe9-78260ea81655
+# ╠═640d8ef6-f592-4f82-94e3-198e792f5110
 # ╟─82c4e128-a488-4032-acaf-2b0549cea8f0
 # ╟─60ae80a6-2354-4c68-abd8-2cc2f839d4db
 # ╟─4e0aaf37-4150-4526-b0fe-707bd8d9602b
