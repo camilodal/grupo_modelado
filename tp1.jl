@@ -240,20 +240,55 @@ function seir!(du, u,p,t)
 	return du
 end;
 
+# ╔═╡ 9550fd55-4be0-450f-9b89-f02d767d87c9
+function getγEseirS(sol,n)
+		res = zeros(n)
+		for i in 1:n
+			res[i] = sol.(i,idxs=2)*sol.prob.p[3]
+		end
+	return res
+end
+
+# ╔═╡ d79ffc2d-4610-410d-8b57-806a0a27258d
+@bind β_seir Slider(0: 0.001: 5)			
+
+# ╔═╡ d6eb2277-9253-467f-97ef-4350d7f95956
+@bind σ_seir Slider(0: 0.0001: 2)			
+
+# ╔═╡ a34f184e-0071-4095-8d25-88e54bae2136
+@bind γ_seir Slider(0: 0.0001: 2)			
+
+# ╔═╡ 2a01ad43-1a89-4a0b-b448-e0a0d203e46d
+@bind s_seir Slider(0.9: 0.00001: 0.99999)			
+
+# ╔═╡ 5236d234-37b7-4271-be05-78211c1b47d2
+@bind δ_seir Slider(0.9: 0.00001: 0.99999)			
+
+# ╔═╡ 01a4ac89-0165-40ee-9de2-92e7866bfb16
+γ_seir
+
 # ╔═╡ 3977ee72-7979-4fba-8455-35560d288bfc
 begin 
-	params_seir =[0.4,0.3,  0.2]
-	u₀_seir =  [0.2, 0.8, 0.1, 0]
-	ts_seir = (0., 100.)
+	params_seir = [β_seir, σ_seir, γ_seir]
+	u₀_seir =  [s_seir, δ_seir*(1-s_seir), 1-s_seir-δ_seir*(1-s_seir), 0]
+	ts_seir = (0., 1000.)
 	comp_prob_seir = ODEProblem(seir!, u₀_seir, ts_seir, params_seir)
-end
+end;
 	
 
 # ╔═╡ a59669b9-29a7-414b-a8e4-660eb39b5a80
-sol_comp_seir = solve(comp_prob_seir)
+sol_comp_seir = solve(comp_prob_seir);
 
-# ╔═╡ 6990ed25-baa8-4d50-ace3-61cdbd5ed08a
+# ╔═╡ 755257fc-b59a-40d5-b04b-b591de8f4897
+begin
+plot([1:200],getγEseirS(sol_comp_seir, 200), linewidth=10)
+scatter!([1:42],primera_ola.New_cases)
+end
+
+# ╔═╡ 4e33d173-6db7-4e83-b213-3bbe3a1b32ea
+begin
 plot(sol_comp_seir)
+end
 
 # ╔═╡ ec272190-8008-4d4b-916b-dc355fbce8eb
 md""" ### Modelo SEIRS
@@ -374,18 +409,6 @@ md"""
 	!!! b
 		Modelo SEIR"""
 
-# ╔═╡ 95edd622-53bc-43f1-a8f8-ac4ca74ea860
-function getγEseirS(sol,n)
-		res = zeros(n)
-		for i in 1:n
-			res[i] = sol.(i,idxs=2)*sol.prob.p[3]
-		end
-	return res
-end
-
-# ╔═╡ 9090e0cb-6694-4596-8c30-0d696a9ea90e
-
-
 # ╔═╡ 173cc445-7de6-4ca1-8515-3796bce6b1f8
 function func_seir(x,r)
 		tot_loss = 0.0
@@ -407,11 +430,13 @@ end
 	
 
 # ╔═╡ f79362e7-0401-4aaa-9c33-b5a1be4d62da
-optprob_seir = OptimizationProblem(func_seir,[0.73,0.19, 0.1, 0.15, 0.1],lb=[0, 0, 0, 0, 0],ub=[1, 1, 0.9, 0.9, 0.9])
+optprob_seir = OptimizationProblem(func_seir,[ 0.999 ,0.999, 2.34, 1.84, 1.52],lb=[0, 0, 0, 0, 0],ub=[1, 1, 3, 3, 3])
 
 # ╔═╡ 558b3d9f-f59b-4eb7-9b08-560cc31deacc
 p_seir = solve(optprob_seir,SAMIN(),maxiters=100000)
 
+# ╔═╡ 9c949254-a2b8-43e9-b94a-f9078f2cd7dd
+p_seir
 
 # ╔═╡ 0750cba0-b4f7-43dc-afad-33ac50f9ca1c
 begin
@@ -430,7 +455,7 @@ md"""
 # ╔═╡ ac52d23e-9392-40d4-a8fc-276f88fa0bf5
 function func_seirs(x,r)
 		tot_loss = 0.0
-		n = length(primera_ola.New_cases)
+		n = length(segunda_ola.New_cases)
 		datos_iniciales=[x[1], x[2]*(1-x[1]), 1-x[1]-x[2]*(1-x[1]), 0]
 		parametros = x[3:6]
 		prob     = ODEProblem(seirs!,datos_iniciales,(1,n),parametros)#,bstol=1e-7, reltol=1e-7)
@@ -440,14 +465,14 @@ function func_seirs(x,r)
 	    else
 			sol_eval = getγEseirS(sol,n)
 			for i in 1:n
-				tot_loss += (sol_eval[i]-primera_ola.New_cases[i])^2
+				tot_loss += (sol_eval[i]-segunda_ola.New_cases[i])^2
 			end			
 		end
 			return tot_loss
 end
 
 # ╔═╡ eb3ef726-69e8-414f-813a-a2d055377637
-optprob_seirs = OptimizationProblem(func_seirs,[0.73,0.19, 0.1, 0.15, 0.1, 0.2],lb=[0, 0, 0, 0, 0, 0], 0,ub=[1, 1, 0.9, 0.9, 0.9, 0.9])
+optprob_seirs = OptimizationProblem(func_seirs,[0.9999,0.99999, 0.66, 0.15, 0.1, 0.2],lb=[0, 0, 0, 0, 0, 0], 0,ub=[1, 1, 0.9, 0.9, 0.9, 0.9])
 
 # ╔═╡ d7139c4f-18bf-405a-bbe9-78260ea81655
 p_seirs = solve(optprob_seirs,SAMIN(),maxiters=100000)
@@ -456,10 +481,10 @@ p_seirs = solve(optprob_seirs,SAMIN(),maxiters=100000)
 # ╔═╡ 640d8ef6-f592-4f82-94e3-198e792f5110
 begin
 	datos_iniciales_seirs=[p_seirs[1], p_seirs[2]*(1-p_seirs[1]), 1-p_seirs[1]-p_seirs[2]*(1-p_seirs[1]), 0]
-	prob_final_seirs = ODEProblem(seirs!,p_seirs,(1,42),p_seirs[3:6])
+	prob_final_seirs = ODEProblem(seirs!,p_seirs,(1,52),p_seirs[3:6])
 	sol_opt_seirs    = solve(prob_final_seirs,Vern7())
-	plot([1:42], getγEseirS(sol_opt_seir, n))
-	scatter!([1:42],primera_ola.New_cases)
+	plot([1:52], getγEseirS(sol_opt_seir, 52))
+	scatter!([1:52],segunda_ola.New_cases)
 end
 
 # ╔═╡ 82c4e128-a488-4032-acaf-2b0549cea8f0
@@ -2536,9 +2561,17 @@ version = "1.4.1+0"
 # ╠═33884a42-0668-4288-978b-0d3162a2cad9
 # ╟─b96e4d23-c011-407b-92c2-1d2f8133460b
 # ╠═d7112e6d-9b66-4764-bd95-292c68331bc9
+# ╠═9550fd55-4be0-450f-9b89-f02d767d87c9
+# ╠═d79ffc2d-4610-410d-8b57-806a0a27258d
+# ╠═d6eb2277-9253-467f-97ef-4350d7f95956
+# ╠═a34f184e-0071-4095-8d25-88e54bae2136
+# ╠═2a01ad43-1a89-4a0b-b448-e0a0d203e46d
+# ╠═5236d234-37b7-4271-be05-78211c1b47d2
+# ╟─01a4ac89-0165-40ee-9de2-92e7866bfb16
 # ╠═3977ee72-7979-4fba-8455-35560d288bfc
 # ╠═a59669b9-29a7-414b-a8e4-660eb39b5a80
-# ╠═6990ed25-baa8-4d50-ace3-61cdbd5ed08a
+# ╠═755257fc-b59a-40d5-b04b-b591de8f4897
+# ╠═4e33d173-6db7-4e83-b213-3bbe3a1b32ea
 # ╟─ec272190-8008-4d4b-916b-dc355fbce8eb
 # ╠═e4056557-d1e7-476f-ac57-4a8855dd734f
 # ╠═ee00044c-366e-415e-abe7-053ba3ff5f3f
@@ -2552,11 +2585,10 @@ version = "1.4.1+0"
 # ╠═17a2c84a-b3b0-4d4a-918b-050e20d74d81
 # ╠═ffb9dd25-84a8-4be9-ad42-8b8bac905256
 # ╟─3b4e15a8-b87f-4bd2-9456-79ffee764641
-# ╠═95edd622-53bc-43f1-a8f8-ac4ca74ea860
-# ╠═9090e0cb-6694-4596-8c30-0d696a9ea90e
 # ╠═173cc445-7de6-4ca1-8515-3796bce6b1f8
 # ╠═f79362e7-0401-4aaa-9c33-b5a1be4d62da
 # ╠═558b3d9f-f59b-4eb7-9b08-560cc31deacc
+# ╠═9c949254-a2b8-43e9-b94a-f9078f2cd7dd
 # ╠═0750cba0-b4f7-43dc-afad-33ac50f9ca1c
 # ╟─c8cab669-b51b-47ca-ad81-eef82b00a051
 # ╠═ac52d23e-9392-40d4-a8fc-276f88fa0bf5
