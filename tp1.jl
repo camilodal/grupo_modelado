@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.27
+# v0.19.29
 
 using Markdown
 using InteractiveUtils
@@ -234,7 +234,7 @@ function seir!(du, u,p,t)
 	S, E, I, R = u
 	N = I + S + R + E
 	du[1] = - β * (S*I/N)
-	du[2] = β * (S*I/N) - σ * E
+	du[2] = β * (S*I/N) - γ * E
 	du[3] = γ * E - σ * I 
 	du[4] = σ * I
 	return du
@@ -299,7 +299,7 @@ function seirs!(du,u,p,t)
 	S, E, I, R = u
 	N = I + S + R + E
 	du[1] = - β * (S*I/N) + δ * R
-	du[2] = β * (S*I/N) - σ * E
+	du[2] = β * (S*I/N) - γ * E
 	du[3] = γ * E - σ * I 
 	du[4] = σ * I - δ * R
 	return du
@@ -399,8 +399,28 @@ md"""
 	!!! b
 		Modelo SEIR"""
 
-# ╔═╡ 0020cfbf-f567-4e87-9ce6-def77a1731ad
-@bind δ_seir Slider(0.0: 0.0000001: 0.99999)		
+# ╔═╡ 173cc445-7de6-4ca1-8515-3796bce6b1f8
+function func_seir(x,r)
+		tot_loss = 0.0
+		n = length(primera_ola.New_cases)
+		datos_iniciales=[1-x[1]-x[2]*(1-x[1]),x[2]*(1-x[1]),x[1], 0]
+		parametros = x[3:5]
+		prob     = ODEProblem(seir!,datos_iniciales,(1,n),parametros)#,bstol=1e-7, reltol=1e-7)
+		sol      = solve(prob,Vern7())
+	    if any((!SciMLBase.successful_retcode(s.retcode) for s in sol)) # 
+	        tot_loss = Inf
+	    else
+			sol_eval = getγEseirS(sol,n)
+			for i in 1:n
+				tot_loss += (sol_eval[i]-primera_ola.New_cases[i])^2
+			end			
+		end
+			return tot_loss
+end
+	
+
+# ╔═╡ 53e8a84f-6063-474f-88fd-50891cd34a16
+δ_seir = 1e-6
 
 # ╔═╡ 3977ee72-7979-4fba-8455-35560d288bfc
 begin 
@@ -439,28 +459,8 @@ begin
 plot(sol_comp_seir)
 end
 
-# ╔═╡ 173cc445-7de6-4ca1-8515-3796bce6b1f8
-function func_seir(x,r)
-		tot_loss = 0.0
-		n = length(primera_ola.New_cases)
-		datos_iniciales=[1-x[1]-x[2]*(1-x[1]),x[2]*(1-x[1]),x[1], 0]
-		parametros = x[3:5]
-		prob     = ODEProblem(seir!,datos_iniciales,(1,n),parametros)#,bstol=1e-7, reltol=1e-7)
-		sol      = solve(prob,Vern7())
-	    if any((!SciMLBase.successful_retcode(s.retcode) for s in sol)) # 
-	        tot_loss = Inf
-	    else
-			sol_eval = getγEseirS(sol,n)
-			for i in 1:n
-				tot_loss += (sol_eval[i]-primera_ola.New_cases[i])^2
-			end			
-		end
-			return tot_loss
-end
-	
-
 # ╔═╡ f79362e7-0401-4aaa-9c33-b5a1be4d62da
-optprob_seir = OptimizationProblem(func_seir,[1/45.5e6,δ_seir, 1.34, 1.84, 1.52],lb=[1/45.5e6, 0, 0, 0, 0],ub=[1000/45.5e6, 20, 10, 10, 10])
+optprob_seir = OptimizationProblem(func_seir,[1/45.5e6,δ_seir, 48, 1.84, 48],lb=[0., 0, 0, 0, 0],ub=[1000/45.5e6, 1e-6, 50, 10, 50])
 
 # ╔═╡ 558b3d9f-f59b-4eb7-9b08-560cc31deacc
 p_seir = solve(optprob_seir,SAMIN(),maxiters=100000)
@@ -498,11 +498,11 @@ function func_seirs(x,r)
 			return tot_loss
 end
 
-# ╔═╡ 255ff304-4a64-44c9-8aa4-e10a88208b31
-@bind δ Slider(0:0.00000001:0.999)
+# ╔═╡ f8e6e6d7-9a6f-4661-8d78-e9496ecd0fcd
+δ =0.001
 
 # ╔═╡ eb3ef726-69e8-414f-813a-a2d055377637
-optprob_seirs = OptimizationProblem(func_seirs,[10/45.5e6,δ, 0.66, 0.15, 0.1, 5.56],lb=[1/45.5e6, 0, 0, 0, 0, 1.5], 0,ub=[100/45.5e6, 1, 1.1,10, 10, 19])
+optprob_seirs = OptimizationProblem(func_seirs,[1/45.5e6,0.1, 0.1, 1.84, 0.6, 0.1],lb=[0., 0, 0, 0, 0,0],ub=[1000000/45.5e6, 0.5, 15, 10, 1,1.5])
 
 # ╔═╡ d7139c4f-18bf-405a-bbe9-78260ea81655
 p_seirs = solve(optprob_seirs,SAMIN(),maxiters=100000)
@@ -512,7 +512,7 @@ begin
 	datos_iniciales_seirs=[1-p_seirs[1]-p_seirs[2]*(1-p_seirs[1]), p_seirs[2]*(1-p_seirs[1]),p_seirs[1],0]
 	prob_final_seirs = ODEProblem(seirs!,datos_iniciales_seirs,(1,52),p_seirs[3:6])
 	sol_opt_seirs    = solve(prob_final_seirs,Vern7())
-	plot([1:52], getγEseirS(sol_opt_seir, 52))
+	plot([1:52], getγEseirS(sol_opt_seirs, 52))
 	scatter!([1:52],segunda_ola.New_cases)
 end
 
@@ -568,33 +568,55 @@ La idea de la segunda parte del trabajo es intentar mejorar los ajustes anterior
 Para agregar la mortalidad por COVID basta con agregar un término de la forma $-\varepsilon I$ en la ecuación de $\dot{I}$. Sin embargo, este pequeño cambio altera la población total por lo cual ya no puede suponerse que $N=1$ y debe reemplazarse $N$ por la suma de todas las variables. 
 Además, pueden incorporarse la natalidad y la mortalidad naturales de la población. Para ello, asumimos que los recién nacidos son _susceptibles_, por lo cual aparece un término de la forma $+\eta N$ en la ecuación de $\dot{S}$, pero la mortalidad afecta por igual a todas las categorías, lo que equivale al agregado de un término $-\mu X$ en la ecuación de cada variable ($X= S,$ $I,$ $R$ y $E$, si corresponde). 
 
-#### Reducir la población efectivamente afectada
-En el análisis previo asumimos que la población argentina era de unos 45,5 millones de personas y que se mantenía esencialmente fija a lo largo del período analizado. Un defecto de este enfoque es que asume que todo el país se vio afectado por igual por la primera ola de la pandemia. Esto no es correcto por al menos dos razones: las zonas más afectadas inicialmente fueron los grandes conglomerados urbanos que contienen una alta proporción de la población, pero no la totalidad. Además, el confinamiento temprano hizo que mucha gente restringiera tanto sus contactos que podría considerarsela en la práctica aislada de la posibilidad de infección. Para tomar en cuenta esto podemos considerar que la población total $N$ no es $1$, sino una fracción menor, que resulta a priori desconocida. Es decir: tomaremos $N$ como un parámetro a ajustar con la restricción $0\le N\le 1$. 
-Un modelo un poco más complejo podría suponer que $N$ varía con el tiempo según alguna regla. Por ejemplo: $N$ podría ser una función lineal de $t$. 
-
-#### Considerar el sub-registro. 
-En una epidemia como la de COVID es altamente probable que los testeos no permitan registrar la totalidad de los casos positivos. Una manera de tener esto en cuenta es, por ejemplo, desdoblar a los infectados en dos conjuntos: los infectados registrados $I_r$ y los no registrados $I_n$. A los fines del contagio, debemos tomar $I=I_r+I_n$. A su vez, los expuestos pasan a ser infectados a tasa $\gamma$, pero se reparten en ambas categorías con proporciones complementarias. Es decir que al término $-\gamma E$ en la ecuación de $\dot{E}$ le corresponden términos $+\alpha \gamma E $  y $+(1-\alpha)\gamma E$ en $\dot{I_r}$ e $\dot{I_n}$ respectivamente. Ambos conjuntos se recuperan a una misma tasa $\sigma$. Por supuesto, el ajuste debe hacerse sólo con los valores de $I_r$. En este caso interesa verificar si se obtiene un mejor ajuste y/o valores más razonables de los parámetros y, en tal caso, estimar la magnitud del subregistro.
-
 #### Propagadores y aislados. 
 El modelo SEPAR (SEPIR por sus siglas en inglés) propone la separación de los infectados en Propagadores y Aislados (Isolated). De manera similar a lo expuesto en el caso anterior, los _expuestos_ se reparten entre estas dos categorías, que luego se recuperan a una misma tasa. Sin embargo, sólo los Propagadores afectan al contagio. El ajuste debe hacerse respecto del total de infectados, que se suponen adecuadamente registrados ($I=P+A$). 
-
-
-#### Función de costo
-Una posibilidad es diseñar una función de costo más robusta que considere no sólo el valor de los datos, sino su pendiente (como aproximación de la derivada). La función `diff` calcula las diferencias entre los casilleros consecutivos de un vector:
-
-	diff(datos)[i] = datos[i+1]-datos[i]
-
-La función de costo puede computar la suma de las cuadrados de las diferencias entre los valores de la solución y los datos y también la suma de los cuadrados de las diferencias entre las pendientes de la función y las pendientes de los datos, asignando un peso a cada sumatoria (por ejemplo: 0.5 a cada una). La minimización de una función de este tipo debería tender no sólo a aproximar los datos sino a producir soluciones que copien la _forma_ de los datos. 
-
-
-#### Combinaciones
-Cada una de las alternativas anteriores se enfoca en algún aspecto puntual con el objetivo de contruir un modelo más realista. Naturalmente, es posible combinar dos o más de estas sugerencias para construir un modelo más complejo aún. 
 """
 
 
 
 # ╔═╡ faa9e056-2c53-4cd3-a24e-15dd593beaa3
+function separ!(du, u,p,t)
+	β, σ, γ_1,γ_2 = p
+	S, E_P, E_A, I_P, I_A, R = u
+	N = I_P + I_A + S + R + E_P + I_A +R
+	du[1] = - β * (S*(I_P +I_A)/N)
+	du[2] = β * (S*I_P/N) - γ_1 * E_P
+	du[3] = β * (S*I_A/N) - γ_2 * E_A
+	du[4] = γ_1 * E_P - σ * I_P 
+	d[5] = γ_2 * E_A - σ * I_A
+	du[6] = σ * (I_P +I_A)
+	return du
+end;
 
+# ╔═╡ a43635de-584c-413c-a114-b12adaae2b1c
+function getγEseparS(sol,n)
+		res = zeros(n)
+		for i in 1:n
+			res[i] = sol.prob.p[3] * sol.(i,idxs=2)+sol.prob.p[4] * sol.(i,idxs=3) #prop.p[parametro] variable
+		end
+	return res
+end;
+
+# ╔═╡ 37bf947a-664c-4b3e-be24-e508657bb4db
+function func_separ(x,r)
+		tot_loss = 0.0
+		n = length(primera_ola.New_cases)
+		datos_iniciales=[1-x[1]-x[2]*(1-x[1]),x[3]*(1-x[1]),x[2] * x[1], (1-x[2]) * x[1],0]
+		parametros = x[3:5]
+		prob     = ODEProblem(seir!,datos_iniciales,(1,n),parametros)#,bstol=1e-7, reltol=1e-7)
+		sol      = solve(prob,Vern7())
+	    if any((!SciMLBase.successful_retcode(s.retcode) for s in sol)) # 
+	        tot_loss = Inf
+	    else
+			sol_eval = getγEseirS(sol,n)
+			for i in 1:n
+				tot_loss += (sol_eval[i]-primera_ola.New_cases[i])^2
+			end			
+		end
+			return tot_loss
+end
+
+	
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -965,6 +987,12 @@ version = "0.6.8"
 git-tree-sha1 = "bdb1942cd4c45e3c678fd11569d5cccd80976237"
 uuid = "4e289a0a-7415-4d19-859d-a7e5c4648b56"
 version = "1.0.4"
+
+[[deps.EpollShim_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "8e9441ee83492030ace98f9789a654a6d0b1f643"
+uuid = "2702e6a9-849d-5ed8-8c21-79e8b8f9ee43"
+version = "0.0.20230411+0"
 
 [[deps.ExceptionUnwrapping]]
 deps = ["Test"]
@@ -2166,10 +2194,10 @@ uuid = "19fa3120-7c27-5ec5-8db8-b0b0aa330d6f"
 version = "0.2.0"
 
 [[deps.Wayland_jll]]
-deps = ["Artifacts", "Expat_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Pkg", "XML2_jll"]
-git-tree-sha1 = "ed8d92d9774b077c53e1da50fd81a36af3744c1c"
+deps = ["Artifacts", "EpollShim_jll", "Expat_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Pkg", "XML2_jll"]
+git-tree-sha1 = "7558e29847e99bc3f04d6569e82d0f5c54460703"
 uuid = "a2964d1f-97da-50d4-b82a-358c7fce9d89"
-version = "1.21.0+0"
+version = "1.21.0+1"
 
 [[deps.Wayland_protocols_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -2410,9 +2438,9 @@ version = "3.5.0+0"
 
 [[deps.xkbcommon_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg", "Wayland_jll", "Wayland_protocols_jll", "Xorg_libxcb_jll", "Xorg_xkeyboard_config_jll"]
-git-tree-sha1 = "9ebfc140cc56e8c2156a15ceac2f0302e327ac0a"
+git-tree-sha1 = "9c304562909ab2bab0262639bd4f444d7bc2be37"
 uuid = "d8fb68d0-12a3-5cfd-a85a-d49703b185fd"
-version = "1.4.1+0"
+version = "1.4.1+1"
 """
 
 # ╔═╡ Cell order:
@@ -2476,14 +2504,14 @@ version = "1.4.1+0"
 # ╠═17a2c84a-b3b0-4d4a-918b-050e20d74d81
 # ╠═ffb9dd25-84a8-4be9-ad42-8b8bac905256
 # ╟─3b4e15a8-b87f-4bd2-9456-79ffee764641
-# ╠═0020cfbf-f567-4e87-9ce6-def77a1731ad
 # ╠═173cc445-7de6-4ca1-8515-3796bce6b1f8
+# ╠═53e8a84f-6063-474f-88fd-50891cd34a16
 # ╠═f79362e7-0401-4aaa-9c33-b5a1be4d62da
 # ╠═558b3d9f-f59b-4eb7-9b08-560cc31deacc
 # ╠═0750cba0-b4f7-43dc-afad-33ac50f9ca1c
 # ╟─c8cab669-b51b-47ca-ad81-eef82b00a051
 # ╠═ac52d23e-9392-40d4-a8fc-276f88fa0bf5
-# ╠═255ff304-4a64-44c9-8aa4-e10a88208b31
+# ╠═f8e6e6d7-9a6f-4661-8d78-e9496ecd0fcd
 # ╠═eb3ef726-69e8-414f-813a-a2d055377637
 # ╠═d7139c4f-18bf-405a-bbe9-78260ea81655
 # ╠═640d8ef6-f592-4f82-94e3-198e792f5110
@@ -2495,5 +2523,7 @@ version = "1.4.1+0"
 # ╠═717fb42e-d967-4548-8bba-72f32af5107f
 # ╟─1a391e49-eba4-49ca-a16b-f37cc50bb85b
 # ╠═faa9e056-2c53-4cd3-a24e-15dd593beaa3
+# ╠═a43635de-584c-413c-a114-b12adaae2b1c
+# ╠═37bf947a-664c-4b3e-be24-e508657bb4db
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
