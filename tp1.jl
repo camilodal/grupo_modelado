@@ -4,12 +4,41 @@
 using Markdown
 using InteractiveUtils
 
+# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
+macro bind(def, element)
+    quote
+        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
+        local el = $(esc(element))
+        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
+        el
+    end
+end
+
 # ╔═╡ e8d8fd8e-48ce-11ee-3acb-db987c0fd698
 using DataFrames, CSV, Plots, DifferentialEquations, Optimization, DiffEqParamEstim,OptimizationOptimJL, PlutoUI
 
-# ╔═╡ c3e2631a-c0f7-438b-94da-c6f85d13b917
-md"""## Filtrado de los datos
+# ╔═╡ c1bd779a-b9a4-488f-bba4-05ee372828e9
+md"""# TP $n^\circ$ 1: Modelado de datos de COVID.
 
+**Nota**: La resolución del TP puede hacerse en grupos de a lo sumo 3 personas. Puede hacerse sobre esta misma notebook o en un archivo de código para correr en una terminal de `Julia`, en cuyo casos el análisis puede agregarse en forma de comentarios. """
+
+
+# ╔═╡ 7bfd4205-a13e-4ce4-9a8f-9c1e86414550
+md"""El objetivo de este trabajo es analizar y modelar los datos de la primera etapa del COVID en la Argentina. Para ello, tomaremos los datos proporcionados por la Organización Mundial de la Salud. 
+
+Para empezar, cargar los datos, filtrarlos por país y graficarlos. """
+
+
+
+
+# ╔═╡ c3e2631a-c0f7-438b-94da-c6f85d13b917
+md"""### Filtrado de los datos
+Vamos a realizar las siguientes operaciones, para seleccionar un conjunto de datos adecuado: 
+
++ Resulta práctico utilizar los modelos en términos de porcentajes, para lo cual normalizaremos los datos asumiendo una población total de 45,5 millones.
++ Es sabido que el ingreso del virus al país fue relativamente tardío, por lo cual no tiene mucho sentido considerar el período inicial, en el que no se registran casos. Vamos a tomar los datos comenzando cinco días antes del primer registro de casos positivos. 
++ Los datos muestran bastante ruido. En particular, se observa una caída perceptible en el registro de casos positivos durante los fines de semana. Para reducir un poco la variabilidad, contaremos los casos por semana en lugar de diariamente. 
++ Sólo consideraremos las primeras dos olas de pandemia. Separar los datos en dos conjuntos: uno que contenga sólo la primera ola (tramo creciente y tramo decreciente) y otro que contenga las primeras dos olas juntas. 
 """
 
 # ╔═╡ 2ab6f43e-f61b-4d88-b2c1-483fdf2b403a
@@ -126,7 +155,7 @@ begin
 end
 
 # ╔═╡ ddf46cb1-9f4a-43e7-820a-7722a865f0fe
-md""" # Modelado: 
+md""" ## Modelado: 
 
 Consideraremos en principio, tres  modelos sencillos. A saber: """
 
@@ -157,15 +186,34 @@ function sir!(du,u,p,t)
 	return du
 end;
 
-# ╔═╡ 897aa1c1-f781-4559-b979-00d8c2600909
- 
-function getγEseirS(sol,n)
-		res = zeros(n)
-		for i in 1:n
-			res[i] = sol.prob.p[3] * sol.(i,idxs=2) #prop.p[parametro] variable
-		end
-	return res
-end;
+# ╔═╡ 18d59ab4-34ad-45d6-8aac-757d15743c96
+md""" $\epsilon, \beta, \sigma$  en ese orden: """
+
+# ╔═╡ 5f48b2e2-b5e7-4684-a8f8-2684481dc430
+@bind ϵ Slider(0:0.01:1)
+
+# ╔═╡ c5ba5d5c-b8a5-4f2a-92ed-2514d4750654
+@bind β Slider(0:0.1:5)
+
+# ╔═╡ ce5f8609-f880-422b-9687-96a0b9aecb7f
+@bind σ Slider(0:0.1:5)
+
+# ╔═╡ 247e11a4-2687-4ded-a8e4-ba6726c33a53
+begin 
+	S₀ = 1 - ϵ
+	I₀ = ϵ 
+	R₀ = 0
+	params = [β,σ]
+	u₀ =  [S₀,I₀,R₀]
+	ts = (0., 100.)
+	comp_prob = ODEProblem(sir!, u₀, ts, params)
+end
+
+# ╔═╡ 33884a42-0668-4288-978b-0d3162a2cad9
+begin 
+	sol_comp = solve(comp_prob)
+	plot(sol_comp)
+end 
 
 # ╔═╡ b96e4d23-c011-407b-92c2-1d2f8133460b
 md"""## Modelo SEIR
@@ -193,15 +241,51 @@ function seir!(du, u,p,t)
 end;
 
 # ╔═╡ 9550fd55-4be0-450f-9b89-f02d767d87c9
-
+begin 
+function getγEseirS(sol,n)
+		res = zeros(n)
+		for i in 1:n
+			res[i] = sol.prob.p[3] * sol.(i,idxs=2) #prop.p[parametro] variable
+		end
+	return res
+end
 function getβSIsir(sol,n)
 	nI = zeros(n)
 	for i in 1:n
 		nI[i] = sol.(i,idxs=1) * sol.(i,idxs=2) * sol.prob.p[1]
 	end
 	return nI
-end;
+end
+end
 
+# ╔═╡ 6ef764a2-7f26-4cf2-8327-8138d9740897
+md""" β σ γ s δ """
+
+# ╔═╡ 1a4c69c1-7900-4a33-a3cb-cc53e9e1be9b
+@bind β_seir Slider(0: 0.001: 1)		
+
+# ╔═╡ d79ffc2d-4610-410d-8b57-806a0a27258d
+begin 
+	println("beta: ",β_seir)
+end
+
+# ╔═╡ d6eb2277-9253-467f-97ef-4350d7f95956
+@bind σ_seir Slider(0: 0.0001: 2)			
+
+# ╔═╡ 850cbb26-7a0b-49f1-9b18-236c1664dd2d
+println("sigma: ", σ_seir)
+
+# ╔═╡ a34f184e-0071-4095-8d25-88e54bae2136
+@bind γ_seir Slider(0: 0.0001: 1)			
+
+# ╔═╡ cd91f435-e69f-4744-a51d-c7accb4ca238
+println("gamma: ", γ_seir)
+
+# ╔═╡ 2a01ad43-1a89-4a0b-b448-e0a0d203e46d
+@bind s_seir Slider(0.000000001: 0.0000000000000000001: 0.3)			
+
+# ╔═╡ c58fb7db-b94d-4e10-9191-75742bd7e2ca
+println("s: ",s_seir)
 
 # ╔═╡ ec272190-8008-4d4b-916b-dc355fbce8eb
 md""" ### Modelo SEIRS
@@ -221,8 +305,46 @@ function seirs!(du,u,p,t)
 	return du
 end;
 
-# ╔═╡ 748363c6-f3f3-4a1c-a79c-7354a20d9270
-md""" # Implementación de modelos"""
+# ╔═╡ ee00044c-366e-415e-abe7-053ba3ff5f3f
+begin 
+	params_seirs =[0.4, 0.3,  0.2, 0.1]
+	u₀_seirs =  [0.2, 0.8, 0.1, 0]
+	ts_seirs = (0., 100.)
+	comp_prob_seirs = ODEProblem(seirs!, u₀_seirs, ts_seirs, params_seirs)
+end
+
+# ╔═╡ 5be40bb2-933b-4491-b33e-c00ffa6c7fc1
+sol_comp_seirs = solve(comp_prob_seirs)
+
+# ╔═╡ dfe9a4e9-30d1-4cc7-a094-a43689ccfade
+plot(sol_comp_seirs)
+
+# ╔═╡ 07ca02cf-9f0d-46e2-9219-d1e0e78a87ba
+md""" ### La función a minimizar
+
+Hay que tener en cuenta que el dato que tenemos es la cantidad de infectados _nuevos_ de cada semana, mientras que la variable $I$ representa la cantidad total de personas que están infectadas en un determinado momento. 
+
+Lo que queremos ajustar a los datos es la cantidad $\beta S I$ que representa el aporte de casos nuevos.  
+
+La función de pérdida debe calcular la suma de las diferencias de cuadrados entre los datos y $\beta SI$, donde $S$ e $I$ son las componentes de la solución correspondientes a susceptibles e infectados.  El valor de $\beta$ está almacenado dentro de la propia solución: `sol.prob.p` contiene el valor de los parámetros del `ODEProblem` y por lo tanto `β = sol.prob.p[1]`. """
+
+# ╔═╡ 7ac39268-0555-4906-bd84-e1d1185c7814
+md""" ## Primera Parte
+En principio intentaremos ajustar sólo la primera ola de la epidemia, con cada uno de los modelos. Para ello necesitaremos: 
+
++ Las funciones que definen cada uno de los modelos: `sir!`, `seir!`y `seirs!`. 
+
++ Una función general de `costo` que reciba: 
+  - la solución de un modelo,
+  - el rango de tiempos al que corresponden los datos,
+  - los datos
+  - un índice que nos indique cuál es la componente que corresponde a `I` (la segunda en `SIR` y la tercera en `SEIR` y `SEIRS`).   Así, dada la función `costo(sol,tiempos,datos,ind)`, podremos definir la función de pérdida para distintos conjuntos de datos y distintos modelos fijando los últimos tres parámetros. Por ejemplo, para el modelo SIR y la primera ola tendremos algo similar a: 
+
+		sol->costo(sol,tiempos_ola1,ola1,2)
+
++ Opcional: puede resultar práctico contar con una función general que reciba un modelo y todos los argumentos necesarios para generar el problema de optimización correspondiente a ese modelo. En caso de optar por esta opción, deberían considerar la construcción de funciones que extraigan del vector de parámetros a optimizar el dato inicial para el el `ODEProblem` y sus correspondientes parámetros. 
+
++ Se recomienda utilizar el método `SAMIN()` al optimizar."""
 
 # ╔═╡ 21bdbd77-e83f-4395-b03d-5f9ede28f413
 md""" 
@@ -258,9 +380,7 @@ end;
 optprob = OptimizationProblem(func_sir,[100/45.5e6,1/0.5,1],lb=[1/45.5e6,0,0],ub=[1000/45.5e6,21,14])
 
 # ╔═╡ 17a2c84a-b3b0-4d4a-918b-050e20d74d81
-
 p̄ = solve(optprob,SAMIN(),maxiters=10000000)
-
 
 # ╔═╡ ffb9dd25-84a8-4be9-ad42-8b8bac905256
 begin
@@ -271,16 +391,6 @@ begin
 	plot([1:42], getβSIsir(sol_opt, n))
 	scatter!([1:42],primera_ola.New_cases)
 end
-
-# ╔═╡ 6ea1b642-f01d-4733-a3be-5e044d076e09
-md"""
-	El gráfico parece ajustarse de una manera razonable a los valores dados. Sin embargo, los parámetros obtenidos 6.88125 y 6.72211 no tienen sentido, ya que sus inversos, ambos alrededor de 0.15 son demasiado bajos. Según esos valores, habrá aproximadamente 0.15 nuevos contagiados cada semana y, a la vez, 0.15 recuperados, lo que representa un porcentaje muy alto de la población."""
-
-# ╔═╡ 14054f0b-cf87-4602-805f-f1bfe01cd4b0
-md"""Por otro lado, el valor de la función costo queda en:"""
-
-# ╔═╡ bfdd1e56-b2f7-4305-b895-91557f685d64
-costo_sir=func_sir(vcat(datos_in, p̄[2:3]), 0)
 
 # ╔═╡ 3b4e15a8-b87f-4bd2-9456-79ffee764641
 md"""
@@ -310,6 +420,43 @@ end
 # ╔═╡ 53e8a84f-6063-474f-88fd-50891cd34a16
 δ_seir = 1e-6
 
+# ╔═╡ 3977ee72-7979-4fba-8455-35560d288bfc
+begin 
+	params_seir = [β_seir, σ_seir, γ_seir]
+	u₀_seir =  [s_seir, δ_seir*(1-s_seir), 1-s_seir-δ_seir*(1-s_seir), 0]
+	ts_seir = (0., 1000.)
+	comp_prob_seir = ODEProblem(seir!, u₀_seir, ts_seir, params_seir)
+end;
+
+# ╔═╡ 0bd7a062-24ab-4bfc-a043-ce2203fc09a6
+begin 
+	params_sir = [β_seir, σ_seir]
+	u₀_sir =  [1-s_seir,s_seir, 0]
+	ts_sir = (0., 1000.)
+	comp_prob_sir = ODEProblem(sir!, u₀_seir, ts_seir, params_seir)
+	sol_comp_sir = solve(comp_prob_sir)
+end;
+
+# ╔═╡ a59669b9-29a7-414b-a8e4-660eb39b5a80
+sol_comp_seir = solve(comp_prob_seir);
+
+# ╔═╡ 6678a673-37f2-4443-8f83-c186630ad329
+begin
+plot([1:42],getβSIsir(sol_comp_seir, 42), linewidth=10)
+scatter!([1:42],primera_ola.New_cases)
+end
+
+# ╔═╡ 755257fc-b59a-40d5-b04b-b591de8f4897
+begin
+plot([1:42],getγEseirS(sol_comp_seir, 42), linewidth=10)
+scatter!([1:42],primera_ola.New_cases)
+end
+
+# ╔═╡ 4e33d173-6db7-4e83-b213-3bbe3a1b32ea
+begin
+plot(sol_comp_seir)
+end
+
 # ╔═╡ f79362e7-0401-4aaa-9c33-b5a1be4d62da
 optprob_seir = OptimizationProblem(func_seir,[1/45.5e6,δ_seir, 48, 1.84, 48],lb=[0., 0, 0, 0, 0],ub=[1000/45.5e6, 1e-6, 50, 10, 50])
 
@@ -324,12 +471,6 @@ begin
 	plot([1:42], getγEseirS(sol_opt_seir, n))
 	scatter!([1:42],primera_ola.New_cases)
 end
-
-# ╔═╡ cd4b5be7-4532-4c24-9db1-366e5c3c2816
-costo_seir=func_seir(vcat(datos_iniciales_seir, p_seir[3:5]), 0)
-
-# ╔═╡ e177617f-6c9f-40a3-bf90-9f4b8f26e410
-md""" No se ve una mejora en la función de costos, a pesar de haberse agregado la variable de los expuestos al modelo. Además, el tiempo medio entre contagios y tiempo medio de recuperación de nuevo dan mucho más bajo de lo esperado. En cuanto al tiempo medio de incubación, que es 0.02, es aún más bajo y carece de sentido."""
 
 # ╔═╡ c8cab669-b51b-47ca-ad81-eef82b00a051
 md"""
@@ -347,19 +488,26 @@ function func_seirs(x,r)
 	    if any((!SciMLBase.successful_retcode(s.retcode) for s in sol)) # 
 	        tot_loss = Inf
 	    else
+			diff_segunda_ola_datos = diff(segunda_ola.New_cases)
 			sol_eval = getγEseirS(sol,n)
+			diff_seg_ola_function = diff(sol_eval)
+			peso = sum((diff_segunda_ola_datos - diff_seg_ola_function).^2)
+			# Intendo de hacer la funcion de costo usando la pendiente como peso. 
 			for i in 1:n
-				tot_loss += (sol_eval[i]-segunda_ola.New_cases[i])^2
+				#if i == n
+					#tot_loss += (sol_eval[i]-segunda_ola.New_cases[i])^2
+				#else 
+					#tot_loss += (diff_segunda_ola_datos[i]-diff_seg_ola_function[i])*(sol_eval[i]-segunda_ola.New_cases[i])^2
+				#end
+				
 			end			
+			tot_loss = peso*sum((sol_eval-segunda_ola.New_cases).^2)
 		end
 			return tot_loss
 end
 
-# ╔═╡ f8e6e6d7-9a6f-4661-8d78-e9496ecd0fcd
-δ =0.001
-
 # ╔═╡ eb3ef726-69e8-414f-813a-a2d055377637
-optprob_seirs = OptimizationProblem(func_seirs,[1/45.5e6,0.1, 0.1, 1.84, 0.6, 0.1],lb=[0., 0, 0, 0, 0,0],ub=[1000000/45.5e6, 0.5, 15, 10, 1,1.5])
+optprob_seirs = OptimizationProblem(func_seirs,[1/45.5e6,0.1, 0.1, 1.84, 0.6, 0.1],lb=[0., 0, 0, 0, 0,0],ub=[1000000/45.5e6, 0.5, 60, 20, 1,1.5])
 
 # ╔═╡ d7139c4f-18bf-405a-bbe9-78260ea81655
 p_seirs = solve(optprob_seirs,SAMIN(),maxiters=100000)
@@ -373,11 +521,15 @@ begin
 	scatter!([1:52],segunda_ola.New_cases)
 end
 
-# ╔═╡ f0e8a514-08d5-4baf-bbd6-8ab662da6b7f
-costo_seirs=func_seir(vcat(datos_iniciales_seirs, p_seirs[3:6]), 0)
+# ╔═╡ 82c4e128-a488-4032-acaf-2b0549cea8f0
+md"""##### Datos Iniciales
+Para darle mayor libertad al optimizador, haremos que los datos iniciales del modelo sean valores a optimizar. Para ello tendremos en cuenta algunas particularidades de nuestra situación. Por ejemplo: dado que se trata del comienzo de una infección antes inexsistente, es razonable suponer que la cantidad inicial de recuperados es nula. 
+Para fijar ideas, pensemos inicialmente en el modelo SIR. Como debe cumplirse que $S_0+I_0+R_0=1$ y asumimos que $R_0=0$, basta con dejar un único parámetro libre: $S_0$. El valor de $I_0$ será simplemente $I_0 = 1-S_0$. De esta manera, nuestro problema de optimización con SIR tendrá tres parámetros: $S_0$, $\beta$ y $\sigma$ y el dato inicial se construirá como: 
 
-# ╔═╡ 44462ab3-038d-4151-9acd-d1619709cc8d
-md""" De nuevo, a pesar de haber agregado variables y parámetros, la función costo no mejoró e incluso empeoró. Nuestro modelo seirs no logra interpretar las dos olas."""
+	u0 = [S₀,1-S₀,0.]
+
+Los modelos SEIR y SEIRS son un poquito más complejos, dado que aún fijando $R_0=0$ quedan tres parámetros libres que con la restricción $S_0+E_0+I_0=1$ deben reducirse a dos. Utilizaremos entonces, dos parámetros: $S_0$ y $\rho$, donde $\rho$ es la proporción de población _expuesta_ una vez descontados los susceptibles. Es decir: $E_0=\rho(1-S_0)$. Esto impone naturalmente las restricciones $0\le S_0,\rho\le 1$. $I_0$ se deduce directamente de $S_0$ y $\rho$: $I_0 = 1-S_0-E_0$."""
+
 
 # ╔═╡ 60ae80a6-2354-4c68-abd8-2cc2f839d4db
 md""" #### Cotas
@@ -400,8 +552,84 @@ Para cada uno de los modelos analizar:
 + Los parámetros arrojados por el optimizador ¿tienen sentido? (para esto conviene considerar sus inversos). 
 """
 
+# ╔═╡ 9c56ca66-5892-4fad-abb7-4071993cb414
+
+
+# ╔═╡ 98c013a6-e3c0-43e0-a193-fb259aad722a
+md""" ### Dos olas
+
+Finalmente, con el modelo SEIRS se puede intentar ajustar conjuntamente las dos primeras olas de la pandemia (algo que no tiene sentido hacer con los otros modelos). 
+"""
+
+
+# ╔═╡ 717fb42e-d967-4548-8bba-72f32af5107f
+begin 
+	function sub!(du,u,p,t) 
+		β, σ, γ, α = p
+		S, E, Iᵣ, Iₙ, R = u
+		I = Iₙ + Iᵣ
+		N = I + S + R + E
+		du[1] = -β*(S*I/N) 
+		du[2] = β*(S*I/N) - γ*E 
+		du[3] = α*γ*E - σ*I  
+		du[4] = (1-α)*γ*E - σ*I 
+		du[5] = σ*I 
+		return du
+	end
+	function get_sub(sol,n)
+		res = zeros(n)
+		for i in 1:n  
+			res[i] = sol.prob.p[4]*sol.prop.p[3]*sol.(i,idxs=2) #prop.p[parametro] variable
+		end
+		return res 
+	end
+	function func_sub(x,r)
+		tot_loss = 0.0
+		n = length(primera_ola.New_cases)
+		# SEIR -> 2 
+		datos_iniciales=[1-x[1]-x[2]*(1-x[1]),x[2]*(1-x[1]),x[1]/2,x[1]/2,0]
+		parametros = x[3:6]
+		prob = ODEProblem(sub!,datos_iniciales,(1,n),parametros)#,bstol=1e-7, reltol=1e-7)
+		sol      = solve(prob,Vern7())
+	    if any((!SciMLBase.successful_retcode(s.retcode) for s in sol)) 
+	        tot_loss = Inf
+	    else
+			sol_eval = get_sub(sol,n)
+			tot_loss = sum((sol_eval - primera_ola.New_cases).^2) 
+		end
+			return tot_loss
+	end 
+end 
+
+# ╔═╡ 89f4b089-f7db-454a-af64-d2bb63b09bd7
+begin 
+	optprob_sub = OptimizationProblem(func_sub,[10/45.5e6,.1,.1,.1,.1,.1],lb=[1/45.5e6,0,0,0,0,0],ub=[1000/45.5e6,1,1,1,1,1])
+	#para = solve(optprob_sub,SAMIN(),maxiters=10000000)
+end 
+
+# ╔═╡ 5bca7f85-38dd-45bf-970f-7e3096d30fa4
+para = solve(optprob_sub,SAMIN(),maxiters=10000000)
+
+# ╔═╡ 086dad5a-e4df-4da9-9fd6-3175651dde0b
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	#n = length(primera_ola.New_cases)
+	datos_in_sub = [1-para[2]*(1-para[1])-para[1],para[2]*(1-para[1]),para[1],0,0]
+	prob_final_mort = ODEProblem(sub!,datos_in_sub,(1,42),para[3:9])
+	sol_opt_mort    = solve(prob_final_mort,Vern7())
+	plot([1:42], getβSIsir(sol_opt_mort, n))
+	scatter!([1:42],primera_ola.New_cases)
+end
+  ╠═╡ =#
+
 # ╔═╡ 1a391e49-eba4-49ca-a16b-f37cc50bb85b
 md""" ## Segunda Parte
+La idea de la segunda parte del trabajo es intentar mejorar los ajustes anteriores. Para ello sugerimos distintas variantes. Cada grupo deberá elegir al menos una y explorarla, comparando los resultados con los anteriores. 
+
+#### Incluir mortalidad. 
+Para agregar la mortalidad por COVID basta con agregar un término de la forma $-\varepsilon I$ en la ecuación de $\dot{I}$. Sin embargo, este pequeño cambio altera la población total por lo cual ya no puede suponerse que $N=1$ y debe reemplazarse $N$ por la suma de todas las variables. 
+Además, pueden incorporarse la natalidad y la mortalidad naturales de la población. Para ello, asumimos que los recién nacidos son _susceptibles_, por lo cual aparece un término de la forma $+\eta N$ en la ecuación de $\dot{S}$, pero la mortalidad afecta por igual a todas las categorías, lo que equivale al agregado de un término $-\mu X$ en la ecuación de cada variable ($X= S,$ $I,$ $R$ y $E$, si corresponde). 
 
 #### Propagadores y aislados. 
 El modelo SEPAR (SEPIR por sus siglas en inglés) propone la separación de los infectados en Propagadores y Aislados (Isolated). De manera similar a lo expuesto en el caso anterior, los _expuestos_ se reparten entre estas dos categorías, que luego se recuperan a una misma tasa. Sin embargo, sólo los Propagadores afectan al contagio. El ajuste debe hacerse respecto del total de infectados, que se suponen adecuadamente registrados ($I=P+A$). 
@@ -427,7 +655,7 @@ end;
 function getγEseparS(sol,n)
 		res = zeros(n)
 		for i in 1:n
-			res[i] = sol.prob.p[3] * sol.(i,idxs=2)+sol.prob.p[4] * sol.(i,idxs=3)#prop.p[parametro] variable
+			res[i] = sol.prob.p[3] * sol.(i,idxs=2)+sol.prob.p[4] * sol.(i,idxs=3) #prop.p[parametro] variable
 		end
 	return res
 end;
@@ -451,13 +679,13 @@ function func_separ(x,r)
 			return tot_loss
 end
 
-# ╔═╡ d2836052-2c93-43ca-84b8-59c6bf75e822
-optprob_separ = OptimizationProblem(func_separ,[1/45.5e6,0.0001, 0.99, 0.1, 0.1, 0.1, 0.1],lb=[0., 0, 0, 0, 0,0, 0],ub=[1000000/45.5e6, 1, 15, 50, 1,1.5, 1])
+# ╔═╡ c321119e-7efd-48f6-a995-673db89f6e39
+optprob_separ = OptimizationProblem(func_separ,[1/45.5e6,0.0001, 0.99, 1.84, 0.6, 0.1, 0.1],lb=[0., 0, 0, 0, 0,0, 0],ub=[1000000/45.5e6, 1, 15, 50, 1,1.5, 1])
 
-# ╔═╡ e92012ad-6fa6-4ed1-becc-9b30a440bd53
+# ╔═╡ 5e0a0843-7437-445b-ae86-2e95b7ac3bf2
 p_separ = solve(optprob_separ,SAMIN(),maxiters=100000)
 
-# ╔═╡ ecb11d12-aa29-46f2-aae7-bb83e5692b60
+# ╔═╡ 4570d8ed-00a3-4c5d-a291-e677abcef830
 begin
 	datos_iniciales_separ=[1-p_separ[1]-p_separ[2],(1-p_separ[3])p_separ[2],p_separ[3]*p_separ[2],(1-p_separ[3])p_separ[1],p_separ[3]*p_separ[1],0]
 	prob_final_separ = ODEProblem(separ!,datos_iniciales_separ,(1,42),p_separ[4:7])
@@ -2535,6 +2763,8 @@ version = "1.4.1+1"
 
 # ╔═╡ Cell order:
 # ╠═e8d8fd8e-48ce-11ee-3acb-db987c0fd698
+# ╟─c1bd779a-b9a4-488f-bba4-05ee372828e9
+# ╟─7bfd4205-a13e-4ce4-9a8f-9c1e86414550
 # ╟─c3e2631a-c0f7-438b-94da-c6f85d13b917
 # ╟─2ab6f43e-f61b-4d88-b2c1-483fdf2b403a
 # ╠═6c10386c-3dcb-42d8-b834-85e70fb2b3eb
@@ -2551,49 +2781,72 @@ version = "1.4.1+1"
 # ╠═7cbc0897-4f39-4a88-96cd-2b2d6e0b19ef
 # ╠═1a5b434d-1b47-419b-ae5e-6efd0b53409e
 # ╠═83fc7482-8a46-4842-83cb-d05d6f6d67da
-# ╠═ddf46cb1-9f4a-43e7-820a-7722a865f0fe
+# ╟─ddf46cb1-9f4a-43e7-820a-7722a865f0fe
 # ╟─7386a708-0bdc-4bec-8c3e-9c6b5f7d30a6
 # ╠═ebe1d879-8ac6-450f-8ea1-13805aba98db
-# ╠═897aa1c1-f781-4559-b979-00d8c2600909
+# ╟─18d59ab4-34ad-45d6-8aac-757d15743c96
+# ╟─5f48b2e2-b5e7-4684-a8f8-2684481dc430
+# ╟─c5ba5d5c-b8a5-4f2a-92ed-2514d4750654
+# ╟─ce5f8609-f880-422b-9687-96a0b9aecb7f
+# ╠═247e11a4-2687-4ded-a8e4-ba6726c33a53
+# ╠═33884a42-0668-4288-978b-0d3162a2cad9
 # ╟─b96e4d23-c011-407b-92c2-1d2f8133460b
 # ╠═d7112e6d-9b66-4764-bd95-292c68331bc9
 # ╠═9550fd55-4be0-450f-9b89-f02d767d87c9
+# ╟─6ef764a2-7f26-4cf2-8327-8138d9740897
+# ╟─1a4c69c1-7900-4a33-a3cb-cc53e9e1be9b
+# ╟─d79ffc2d-4610-410d-8b57-806a0a27258d
+# ╟─d6eb2277-9253-467f-97ef-4350d7f95956
+# ╟─850cbb26-7a0b-49f1-9b18-236c1664dd2d
+# ╟─a34f184e-0071-4095-8d25-88e54bae2136
+# ╟─cd91f435-e69f-4744-a51d-c7accb4ca238
+# ╟─2a01ad43-1a89-4a0b-b448-e0a0d203e46d
+# ╟─c58fb7db-b94d-4e10-9191-75742bd7e2ca
+# ╟─0bd7a062-24ab-4bfc-a043-ce2203fc09a6
+# ╟─6678a673-37f2-4443-8f83-c186630ad329
+# ╟─3977ee72-7979-4fba-8455-35560d288bfc
+# ╟─a59669b9-29a7-414b-a8e4-660eb39b5a80
+# ╟─755257fc-b59a-40d5-b04b-b591de8f4897
+# ╠═4e33d173-6db7-4e83-b213-3bbe3a1b32ea
 # ╟─ec272190-8008-4d4b-916b-dc355fbce8eb
 # ╠═e4056557-d1e7-476f-ac57-4a8855dd734f
-# ╠═748363c6-f3f3-4a1c-a79c-7354a20d9270
+# ╠═ee00044c-366e-415e-abe7-053ba3ff5f3f
+# ╠═5be40bb2-933b-4491-b33e-c00ffa6c7fc1
+# ╠═dfe9a4e9-30d1-4cc7-a094-a43689ccfade
+# ╟─07ca02cf-9f0d-46e2-9219-d1e0e78a87ba
+# ╟─7ac39268-0555-4906-bd84-e1d1185c7814
 # ╟─21bdbd77-e83f-4395-b03d-5f9ede28f413
 # ╟─15280ce1-9558-4ede-a5ed-7fe3d3e4090b
 # ╠═da818aca-ce13-456c-ac7f-3eca53962c63
 # ╠═df275ce2-59f3-4e1a-aee2-5f6f3a0fed64
 # ╠═17a2c84a-b3b0-4d4a-918b-050e20d74d81
 # ╠═ffb9dd25-84a8-4be9-ad42-8b8bac905256
-# ╠═6ea1b642-f01d-4733-a3be-5e044d076e09
-# ╟─14054f0b-cf87-4602-805f-f1bfe01cd4b0
-# ╠═bfdd1e56-b2f7-4305-b895-91557f685d64
 # ╟─3b4e15a8-b87f-4bd2-9456-79ffee764641
 # ╠═173cc445-7de6-4ca1-8515-3796bce6b1f8
 # ╠═53e8a84f-6063-474f-88fd-50891cd34a16
 # ╠═f79362e7-0401-4aaa-9c33-b5a1be4d62da
 # ╠═558b3d9f-f59b-4eb7-9b08-560cc31deacc
 # ╠═0750cba0-b4f7-43dc-afad-33ac50f9ca1c
-# ╠═cd4b5be7-4532-4c24-9db1-366e5c3c2816
-# ╟─e177617f-6c9f-40a3-bf90-9f4b8f26e410
 # ╟─c8cab669-b51b-47ca-ad81-eef82b00a051
 # ╠═ac52d23e-9392-40d4-a8fc-276f88fa0bf5
-# ╠═f8e6e6d7-9a6f-4661-8d78-e9496ecd0fcd
 # ╠═eb3ef726-69e8-414f-813a-a2d055377637
 # ╠═d7139c4f-18bf-405a-bbe9-78260ea81655
 # ╠═640d8ef6-f592-4f82-94e3-198e792f5110
-# ╟─f0e8a514-08d5-4baf-bbd6-8ab662da6b7f
-# ╟─44462ab3-038d-4151-9acd-d1619709cc8d
+# ╟─82c4e128-a488-4032-acaf-2b0549cea8f0
 # ╟─60ae80a6-2354-4c68-abd8-2cc2f839d4db
 # ╟─4e0aaf37-4150-4526-b0fe-707bd8d9602b
+# ╠═9c56ca66-5892-4fad-abb7-4071993cb414
+# ╟─98c013a6-e3c0-43e0-a193-fb259aad722a
+# ╠═717fb42e-d967-4548-8bba-72f32af5107f
+# ╠═89f4b089-f7db-454a-af64-d2bb63b09bd7
+# ╠═5bca7f85-38dd-45bf-970f-7e3096d30fa4
+# ╠═086dad5a-e4df-4da9-9fd6-3175651dde0b
 # ╟─1a391e49-eba4-49ca-a16b-f37cc50bb85b
 # ╠═faa9e056-2c53-4cd3-a24e-15dd593beaa3
 # ╠═a43635de-584c-413c-a114-b12adaae2b1c
 # ╠═37bf947a-664c-4b3e-be24-e508657bb4db
-# ╠═d2836052-2c93-43ca-84b8-59c6bf75e822
-# ╠═e92012ad-6fa6-4ed1-becc-9b30a440bd53
-# ╠═ecb11d12-aa29-46f2-aae7-bb83e5692b60
+# ╠═c321119e-7efd-48f6-a995-673db89f6e39
+# ╠═5e0a0843-7437-445b-ae86-2e95b7ac3bf2
+# ╠═4570d8ed-00a3-4c5d-a291-e677abcef830
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
