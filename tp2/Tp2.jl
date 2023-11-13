@@ -5,7 +5,7 @@ using Markdown
 using InteractiveUtils
 
 # ╔═╡ 232f7092-7e35-11ee-3548-13d1e42085fa
-using Images, FFTW
+using Images, FFTW, StatsBase
 
 # ╔═╡ 4752cb3e-e050-4573-b030-8b8ddc0840ed
 imagen1= load("bolitas.bmp")
@@ -115,10 +115,6 @@ begin
 		inversa_transformada_8x8!(im[3])
 	end
 end
-cuantizada_intensidad = fill(Float64(0), size(im)[1], size(im)[2])
-		cuantizada_cb = fill(Float64(0), size(im_descompuesta[2])[1], size(im_descompuesta[2])[2])
-		cuantizada_cr = fill(Float64(0), size(im_descompuesta[2])[1], size(im_descompuesta[2])[2])
-		transformada_por_bloques(im_descompuesta)
 
 # ╔═╡ c8f89fe3-02df-45b3-a56d-2bb651b83901
 md""" Cuantizacion """
@@ -138,15 +134,17 @@ begin
 		for i in 1:div(size(im)[1], 8) 
 		for j in 1:div(size(im)[2], 8)
 			vista = view(im_descompuesta[1], 8*(i-1)+1:8*i, 8*(j-1)+1:8*j)
-			round.(vista ./ m_quant)
+			# quiero que se haga por "referencia" la funcion round, no lo probe 
+			round.(Int,vista ./ m_quant)
 		end
 		end
 		for i in 1:div(size(im_descompuesta[2])[1], 8) 
 		for j in 1:div(size(im_descompuesta[2])[2], 8)
+			# quiero que se haga por "referencia" la funcion round, no lo probe 
 			vista = view(im_descompuesta[2], 8*(i-1)+1:8*i, 8*(j-1)+1:8*j)
-			round.(vista ./ m_quant)
+			round.(Int,vista ./ m_quant)
 			vista = view(im_descompuesta[3], 8*(i-1)+1:8*i, 8*(j-1)+1:8*j)
-			round.(vista ./ m_quant)
+			round.(Int,vista ./ m_quant)
 		end
 		end
 		return im_descompuesta
@@ -173,9 +171,10 @@ end
 # ╔═╡ 922ac8b2-5bb7-4520-aa5b-d8fe353fab3b
 begin
 	imdes = cuantizar_dct(imagen1,quant)
+	asdf = round.(Int,imdes[1])
+	print(asdf)
 	print(imdes[1])
-	print(imdes[2])
-	print(imdes[3])
+	#print(imdes[3])
 end
 
 # ╔═╡ e198647a-508d-4691-ac23-de8e1e68a745
@@ -183,11 +182,73 @@ md""" Compresion """
 
 # ╔═╡ 0da373e1-bddf-4fb4-b7fa-825fe0cc584c
 begin 
+	orden_zigzag = []
+	n = 8
+	for k in 2:(n + n - 1)
+		if k % 2 == 0
+			for i in max(1, k - n):min(k - 1, n)
+				push!(orden_zigzag,[k - i,i])
+			end
+		else
+			for i in max(1, k - n):min(k - 1, n)
+				push!(orden_zigzag,[i, k - i])
+			end
+		end
+	end
+	push!(orden_zigzag,[8,8])
 	
+	
+	function compresion_bloques_8x8(m)
+		vect = []
+		for indexs in orden_zigzag
+			push!(vect,m[indexs[1],indexs[2]])
+		end
+	    return rle(vect)
+	end 
+
+	function compresion_matriz(M) 
+		res = []
+		for i in 1:div(size(M)[1], 8) 
+		for j in 1:div(size(M)[2], 8)
+			vista = view(M, 8*(i-1)+1:8*i, 8*(j-1)+1:8*j)
+			vals_reps = compresion_bloques_8x8(vista)
+			push!(res,vals_reps)
+		end
+		end
+		return res
+	end 
+	
+	function inversa_compresion_8x8(M,V)
+		for i in 1:64 
+			M[orden_zigzag[i][1],orden_zigzag[i][2]] = V[i]
+		end
+	end 
+	# necesitamos saber las dimensiones de los bloques de 8x8, filas y columnas
+	function inversa_compresion(A,bloques_fils,bloques_cols)
+		M = zeros(N*8,M*8)
+		# sabemos que size(A) = N*M bloques de filas y columnas
+		i = 1 
+		j = 1
+		for ind in size(A)
+			if ind % bloques_cols == 0
+				i += 1 
+				j = 1 
+				vista = view(M, 8*(i-1)+1:8*i, 8*(j-1)+1:8*j)
+				V = inverse_rle(A[ind][1],A[ind][2])
+				inversa_compresion_8x8(vista,V)
+			else 
+				j += 1
+				vista = view(M, 8*(i-1)+1:8*i, 8*(j-1)+1:8*j)
+				V = inverse_rle(A[ind][1],A[ind][2])	
+				inversa_compresion_8x8(vista,V)
+			end
+		end
+		return M
+	end
 end 
 
-# ╔═╡ 83c84258-49cd-4216-876c-eaeb987ceb38
-#size(c)
+# ╔═╡ b44e45f0-6459-4835-8c99-0c8992555dd8
+
 
 # ╔═╡ 00c55a70-1e10-4dcf-a937-20cb0afd77a2
 begin 
@@ -209,9 +270,9 @@ end
 
 # ╔═╡ b4236736-e0c8-44da-a450-fb27d6cbdbc8
 begin 
-	A = [1 2 ;1 2 ]
+	A = [0.999 2.4 2.323 ;1.234 2.234 23.232; .235 .343 3.3542 ]
 	m_quant = 2*ones(Int,3,3)
-	print(A ./ m_quant)
+	print(round.(A ./ m_quant))
 end 
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -219,10 +280,12 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
 Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
 FFTW = "~1.7.1"
 Images = "~0.26.0"
+StatsBase = "~0.34.2"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -231,7 +294,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.3"
 manifest_format = "2.0"
-project_hash = "ebcc296d442e487695be48e67ec3afc30baef661"
+project_hash = "abe0764e24be74449f91257141a5930703818e34"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1355,7 +1418,7 @@ version = "17.4.0+0"
 # ╠═922ac8b2-5bb7-4520-aa5b-d8fe353fab3b
 # ╟─e198647a-508d-4691-ac23-de8e1e68a745
 # ╠═0da373e1-bddf-4fb4-b7fa-825fe0cc584c
-# ╠═83c84258-49cd-4216-876c-eaeb987ceb38
+# ╠═b44e45f0-6459-4835-8c99-0c8992555dd8
 # ╠═00c55a70-1e10-4dcf-a937-20cb0afd77a2
 # ╠═b4236736-e0c8-44da-a450-fb27d6cbdbc8
 # ╟─00000000-0000-0000-0000-000000000001
