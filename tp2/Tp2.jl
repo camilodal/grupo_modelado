@@ -7,8 +7,8 @@ using InteractiveUtils
 # ╔═╡ 232f7092-7e35-11ee-3548-13d1e42085fa
 using Images, FFTW, StatsBase
 
-# ╔═╡ 4752cb3e-e050-4573-b030-8b8ddc0840ed
-imagen1= load("bolitas.bmp")
+# ╔═╡ d1b53e3e-b2d6-467d-97fa-9b7733d1a658
+md""" ### Preparación"""
 
 # ╔═╡ 1338eb76-a58a-42a7-a429-9b7cfc148164
 function completar_tam_16(im)
@@ -28,6 +28,9 @@ function completar_tam_16(im)
 		return(nueva_im)
 	end
 end
+
+# ╔═╡ b0dd0e30-d6c3-46b9-b250-733741c3658c
+md""" ### Primera etapa"""
 
 # ╔═╡ 471848d0-0e1a-442d-b2dc-b68e5f0090cc
 function descomponer(im)
@@ -50,9 +53,6 @@ for i in 1:(size(nueva_im_cb)[1])
 end
 return([intensidad.-(Float64(128)), nueva_im_cb.-(Float64(128)), nueva_im_cr.-(Float64(128))])
 end
-
-# ╔═╡ 81f9e18f-8463-4e9d-ab10-ea0863415bdc
-imagen_descompuesta = descomponer(imagen1)
 
 # ╔═╡ f065f737-0392-470e-aa5d-39353627dc11
 function descomponer_inversa(im)
@@ -83,11 +83,8 @@ res=colorview(YCbCr, nueva)
 return res
 end
 
-# ╔═╡ f0f5ecc6-dd27-471c-abad-8f5df1b6ee95
-imagen_compuesta = descomponer_inversa(imagen_descompuesta)
-
 # ╔═╡ 5540d711-3295-442c-ba17-706ca1ed1848
-md""" Transformada por bloques"""
+md""" ### Transformada por bloques"""
 
 # ╔═╡ 4d96c454-fbfe-4500-80b4-97e8a9df671a
 begin
@@ -121,7 +118,7 @@ begin
 end
 
 # ╔═╡ c8f89fe3-02df-45b3-a56d-2bb651b83901
-md""" Cuantizacion """
+md""" ### Cuantización """
 
 # ╔═╡ 6e32d7ab-ba46-4a4e-8ed1-a8f0d1a635e8
 begin 
@@ -134,6 +131,7 @@ begin
 			49 64 78 87 103 121 120 101;
 			72 92 95 98 112 100 103 99]
 	# Deberia devolver las tres matrices con UInt 
+	
 	function cuantizar_dct(im, m_quant=quant::Matrix{Int})
 		im_descompuesta = descomponer(im)
 		#println(im_descompuesta[1])
@@ -190,11 +188,196 @@ begin
 end 
 
 # ╔═╡ e198647a-508d-4691-ac23-de8e1e68a745
-md""" Compresion """
+md""" ### Compresión """
+
+# ╔═╡ b44e45f0-6459-4835-8c99-0c8992555dd8
+md"""### Guardado """ 
+
+# ╔═╡ 56b2416a-64d5-4688-8be7-5ba15a72de55
+imagen1 = load("bolitas.bmp")
+
+# ╔═╡ 2867346e-3d11-4206-9363-f7568c9f7404
+begin 
+	#guardar los 3 arrays de la img con #bloquesFilas y #bloquesColumnas 
+	function guardar_M(M,n,m)
+		io = open("Array.ext","w")
+		#tipo Int16
+		write(io,n)
+		write(io,m)
+		#tipo UInt
+		for a in M[1]
+			write(io,a)
+		end		
+		for a in M[2]
+			write(io,a)
+		end
+		for a in M[3]
+			write(io,a)
+		end
+		close(io)
+	end
+	
+	function leer_M(nombre = "Array.ext" ::String)
+		#Solo es una Prueba, no esta bien implementado  
+		io = open(nombre, "r")
+		n = read(io, Int)
+		m = read(io, Int)
+		bloq_filas = div(n,8)
+		bloq_cols = div(m,8)
+		#println((n,m))
+		# Como no hay control de la cantidad de elementos del array resultante tenemos que ir leyendo cada elemento que sabemos que el primero sera  de repetidos hasta que, la suma parcial sea de 64 
+		i = 1 
+		j = 1 
+		termino = false
+		suma_parcial = 0 
+		s = 0 
+		reps = zeros(Int8,0)
+		vals = zeros(Int8,0)
+		A = []
+		while(!termino)
+			if suma_parcial == 64 
+				while s != 0 
+					val = read(io,Int8)
+					#println(val)
+					push!(vals,val)
+					s -= 1
+				end
+				suma_parcial = 0 
+				#println(reps)
+				#println(vals)
+				# en este punto ya tenemos los reps y vals 
+				push!(A,[vals,reps])
+				reps = zeros(Int8,0)
+				vals = zeros(Int8,0)
+				if(j < bloq_cols)
+					j +=1
+				elseif(j < bloq_filas)
+					j = 0 
+					i += 1
+				else
+					#termino Luminosidad
+					termino = true
+				end 
+			else 
+				rep = read(io,Int8)
+				#println(rep)
+				suma_parcial += rep 
+				push!(reps,rep)
+				s += 1
+			end
+		end
+		close(io)
+		
+		#M = inversa_compresion(A,bloq_filas,bloq_cols)
+		return A
+	end
+end
+
+# ╔═╡ ebbd59f7-ea47-412c-8437-b4ef47aab409
+# ╠═╡ disabled = true
+#=╠═╡
+termino = false 
+		while(!termino)
+			if suma_parcial == 64 
+				while s != 0 
+					val = read(io,Int8)
+					println(val)
+					push!(vals,val)
+					s -= 1
+				end
+				suma_parcial = 0 
+				println(reps)
+				println(vals)
+				# en este punto ya tenemos los reps y vals 
+
+				push!(A,[vals,reps])
+				if(i < bloq_filas/2)
+					i +=1
+				else if(j < bloq_col/2)
+					i = 0 
+					j += 1
+				else if( i == bloq_filas/2 && j == bloq_col/2)
+					#termino Cb
+					termino = true
+				end 
+				
+			else 
+				rep = read(io,Int8)
+				println(rep)
+				suma_parcial += rep 
+				push!(reps,rep)
+				s += 1
+			end
+		end
+		termino = false 
+		while(!termino)
+			if suma_parcial == 64 
+				while s != 0 
+					val = read(io,Int8)
+					println(val)
+					push!(vals,val)
+					s -= 1
+				end
+				suma_parcial = 0 
+				println(reps)
+				println(vals)
+				# en este punto ya tenemos los reps y vals 
+
+				push!(A,[vals,reps])
+				if(i < bloq_filas/2)
+					i +=1
+				else if(j < bloq_col/2)
+					i = 0 
+					j += 1
+				else if( i == bloq_filas/2 && j == bloq_col/2)
+					#termino Cb
+					termino = true
+				end 
+				
+			else 
+				rep = read(io,Int8)
+				println(rep)
+				suma_parcial += rep 
+				push!(reps,rep)
+				s += 1
+			end
+		end
+  ╠═╡ =#
+
+# ╔═╡ 47906cab-9184-4af2-81c2-2951524c03ae
+md"""Ejemplo de guardado y lectura, 
+dependiendo que tipo guardamos, vamos a leerlode una forma u otra, si es un int que no sabemos nada al respecto sera Int, pero para los arrays luego de la compresion son UInt """ 
+
+# ╔═╡ 6e1ba806-2e5d-4ede-b34d-e6fe1132b8d3
+begin 
+	io2 = open("Ej.ext", "r")
+	t = read(io2,Int)
+	o = read(io2,Int)
+	#println(t)
+	#println(o)
+	for i in 1:o
+		valor = read(io2,Int8)
+		println(valor)
+	end
+	close(io2)
+end
+
+# ╔═╡ 2ec07496-929c-4d7a-8b2e-773348232899
+md"""### Juntamos todo """ 
+
+# ╔═╡ 84520314-605a-4d63-a879-2793ec1501cf
+#Primer_Paso(imagen1)
+
+# ╔═╡ 976875c7-fe58-4d28-8421-6027071c9074
+begin 
+	K = leer_M()
+end
 
 # ╔═╡ 0da373e1-bddf-4fb4-b7fa-825fe0cc584c
 begin 
 	#ordenamiento zigzag
+
+
 	orden_zigzag = []
 	n = 8
 	for k in 2:(n + n - 1)
@@ -240,103 +423,32 @@ begin
 			M[orden_zigzag[i][1],orden_zigzag[i][2]] = V[i]
 		end
 	end 
+
+	
 	# necesitamos saber las dimensiones de los bloques de 8x8, filas y columnas
+	
 	function inversa_compresion(A,bloques_fils,bloques_cols)
-		M = zeros(N*8,M*8)
+		M = zeros(bloques_fils*8,bloques_cols*8)
 		# sabemos que size(A) = N*M bloques de filas y columnas
 		i = 1 
 		j = 1
-		for ind in size(A)
-			if ind % bloques_cols == 0
+		for ind in size(K)
+			if ind % bloques_cols == 0 
+				vista = view(M, 8*(i-1)+1:8*i, 8*(j-1)+1:8*j)
+				V = inverse_rle(K[ind][1],K[ind][2])
+				inversa_compresion_8x8(vista,V)
 				i += 1 
-				j = 1 
-				vista = view(M, 8*(i-1)+1:8*i, 8*(j-1)+1:8*j)
-				V = inverse_rle(A[ind][1],A[ind][2])
-				inversa_compresion_8x8(vista,V)
+				j = 1
 			else 
-				j += 1
 				vista = view(M, 8*(i-1)+1:8*i, 8*(j-1)+1:8*j)
-				V = inverse_rle(A[ind][1],A[ind][2])	
+				V = inverse_rle(K[ind][1],K[ind][2])	
 				inversa_compresion_8x8(vista,V)
+				j += 1
 			end
 		end
 		return M
 	end
 end 
-
-# ╔═╡ b44e45f0-6459-4835-8c99-0c8992555dd8
-md""" Guardado """ 
-
-# ╔═╡ 2867346e-3d11-4206-9363-f7568c9f7404
-begin 
-	#guardar los 3 arrays de la img con #bloquesFilas y #bloquesColumnas 
-	function guardar_M(M,n,m)
-		io = open("Array.ext","w")
-		#tipo Int16
-		write(io,n)
-		write(io,m)
-		#tipo UInt
-		for a in M[1]
-			write(io,a)
-		end		
-		for a in M[2]
-			write(io,a)
-		end
-		for a in M[3]
-			write(io,a)
-		end
-		close(io)
-	end
-	
-	function leer_M(nombre = "Array.ext" ::String)
-		#Solo es una Prueba, no esta bien implementado  
-		io = open(nombre, "r")
-		n = read(io, Int)
-		m = read(io, Int)
-		println((n,m))
-		# Como no hay control de la cantidad de elementos del array resultante tenemos que ir leyendo cada elemento que sabemos que el primero sera  de repetidos hasta que, la suma parcial sea de 64 
-		Todo = []
-		termino = false
-		suma_parcial = 0 
-		s = 0 
-		reps = []
-		vals = []
-		M = zeros(Int,8,8)
-		#v1 = read(io,UInt)
-		#v2 = read(io,UInt)
-		#println(v1)
-		#println(v2)
-		while(!termino)
-			if suma_parcial == 64 
-				while s != 0 
-					val = read(io,Int8)
-					println(val)
-					push!(vals,val)
-					s -= 1
-				end
-				suma_parcial = 0 
-				println(reps)
-				println(vals)
-				# en este punto ya tenemos los reps y vals 
-				#A = inverse_rle(vals,reps)
-				#inversa_compresion_8x8(M,A)
-				termino = true
-			else 
-				rep = read(io,Int8)
-				println(rep)
-				suma_parcial += rep 
-				push!(reps,rep)
-				s += 1
-			end
-		end
-		close(io)
-		#return M
-	end
-end
-
-# ╔═╡ 47906cab-9184-4af2-81c2-2951524c03ae
-md"""Ejemplo de guardado y lectura, 
-dependiendo que tipo guardamos, vamos a leerlode una forma u otra, si es un int que no sabemos nada al respecto sera Int, pero para los arrays luego de la compresion son UInt """ 
 
 # ╔═╡ da798b8b-4e07-43b9-bd58-e3b79eb67360
 begin 
@@ -350,60 +462,6 @@ begin
 	end		
 	close(io)
 end
-
-# ╔═╡ 61b5ea08-5f14-4eec-95ce-5df1b4078443
-# ╠═╡ disabled = true
-#=╠═╡
-begin 
-	vector_test = [1,1,1,1,0,0,1,1,0,0,0,0,2,0,0,0,0]
-	vals,reps = rle(vector_test)
-	A1 = inverse_rle(vals,reps)
-	println((vals,reps))
-	println(A1)
-	while(!termino)
-			if suma_parcial == 64 
-				while s != 0 
-					push!(vals,read(io,UInt))
-					s -= 1
-				end
-				suma_parcial = 0 
-				println(reps)
-				println(vals)
-				# en este punto ya tenemos los reps y vals 
-				#A = inverse_rle(vals,reps)
-				#inversa_compresion_8x8(M,A)
-				termino = true
-			else 
-				rep = read(io,UInt)
-				suma_parcial += rep 
-				push!(reps,rep)
-				s += 1
-			end
-		end
-end
-  ╠═╡ =#
-
-# ╔═╡ 6e1ba806-2e5d-4ede-b34d-e6fe1132b8d3
-begin 
-	io2 = open("Ej.ext", "r")
-	t = read(io2,Int)
-	o = read(io2,Int)
-	#println(t)
-	#println(o)
-	for i in 1:o
-		valor = read(io2,Int8)
-		println(valor)
-	end
-	close(io2)
-end
-
-# ╔═╡ 2ec07496-929c-4d7a-8b2e-773348232899
-md""" Juntamos todo """ 
-
-# ╔═╡ 10cca2c5-8bd4-44d1-a926-e372b99ccf7a
-begin 
-	#Primer_Paso(imagen1)
-end 
 
 # ╔═╡ d3a2a4c0-7cc9-4b13-a3dd-21db8ce2b847
 begin 
@@ -419,37 +477,56 @@ begin
 	end
 end
 
-# ╔═╡ 976875c7-fe58-4d28-8421-6027071c9074
-begin 
-	leer_M()
-end
-
 # ╔═╡ 28244eab-087b-47c9-ac25-dbb919d4de01
 begin 
-	iluminado = compresion_matriz(cuantizar_dct(imagen1)[1])
-	println(iluminado)
+	lu = cuantizar_dct(imagen1)[1]
+	lu
 end 
 
 # ╔═╡ f77659df-b1be-4808-bb12-16d9c35eedcd
-typeof(iluminado)
+begin 
+	bloques_fils = 1008÷8
+	bloques_cols = 1424÷8
+		M = zeros(bloques_fils*8,bloques_cols*8)
+		# sabemos que size(A) = N*M bloques de filas y columnas
+		i = 1 
+		j = 1
+		for ind in 1:size(K,1)
+			if ind % bloques_cols == 0 
+				vista = view(M, 8*(i-1)+1:8*i, 8*(j-1)+1:8*j)
+				V = inverse_rle(K[ind][1],K[ind][2])
+				inversa_compresion_8x8(vista,V)
+				i += 1
+				j = 1
+			else 
+				vista = view(M, 8*(i-1)+1:8*i, 8*(j-1)+1:8*j)
+				V = inverse_rle(K[ind][1],K[ind][2])	
+				inversa_compresion_8x8(vista,V)
+				#println(vista)
+				j += 1
+			end
+			
+		end
+end
 
 # ╔═╡ 00c55a70-1e10-4dcf-a937-20cb0afd77a2
 begin 
-	# Crear una matriz de ejemplo
-matriz_ejemplo = [1.0 2.0 3.0; 4.0 5.0 6.0; 7.0 8.0 9.0]
-
-# Calcular la DCT en la matriz de ejemplo
-dct_resultado = dct(matriz_ejemplo)
-
-println("Matriz Original:")
-println(matriz_ejemplo)
-println("\nResultado de la DCT:")
-println(dct_resultado)
-idct_resultado = idct(dct_resultado)
-
-println("Resultado de la IDCT:")
-println(idct_resultado)
+	#M .= convert(Matrix{Int8},M)
+	8(bloques_cols-1) + 1 
+	8 * bloques_cols
 end
+
+# ╔═╡ f73074f7-540c-416f-8afa-a8a04ed17a4a
+begin
+	for i in 8:9
+	for j in 1:1424
+		if (M[i,j] != lu[i,j])
+			println(false)
+			break
+		end
+	end
+	end
+end 
 
 # ╔═╡ b4236736-e0c8-44da-a450-fb27d6cbdbc8
 begin 
@@ -1480,12 +1557,11 @@ uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 
 # ╔═╡ Cell order:
 # ╠═232f7092-7e35-11ee-3548-13d1e42085fa
-# ╠═4752cb3e-e050-4573-b030-8b8ddc0840ed
+# ╟─d1b53e3e-b2d6-467d-97fa-9b7733d1a658
 # ╠═1338eb76-a58a-42a7-a429-9b7cfc148164
+# ╟─b0dd0e30-d6c3-46b9-b250-733741c3658c
 # ╠═471848d0-0e1a-442d-b2dc-b68e5f0090cc
-# ╠═81f9e18f-8463-4e9d-ab10-ea0863415bdc
 # ╠═f065f737-0392-470e-aa5d-39353627dc11
-# ╠═f0f5ecc6-dd27-471c-abad-8f5df1b6ee95
 # ╟─5540d711-3295-442c-ba17-706ca1ed1848
 # ╠═4d96c454-fbfe-4500-80b4-97e8a9df671a
 # ╟─c8f89fe3-02df-45b3-a56d-2bb651b83901
@@ -1493,18 +1569,20 @@ uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 # ╟─e198647a-508d-4691-ac23-de8e1e68a745
 # ╠═0da373e1-bddf-4fb4-b7fa-825fe0cc584c
 # ╟─b44e45f0-6459-4835-8c99-0c8992555dd8
+# ╠═56b2416a-64d5-4688-8be7-5ba15a72de55
 # ╠═2867346e-3d11-4206-9363-f7568c9f7404
-# ╠═61b5ea08-5f14-4eec-95ce-5df1b4078443
+# ╠═ebbd59f7-ea47-412c-8437-b4ef47aab409
 # ╟─47906cab-9184-4af2-81c2-2951524c03ae
 # ╠═da798b8b-4e07-43b9-bd58-e3b79eb67360
 # ╠═6e1ba806-2e5d-4ede-b34d-e6fe1132b8d3
 # ╟─2ec07496-929c-4d7a-8b2e-773348232899
-# ╠═10cca2c5-8bd4-44d1-a926-e372b99ccf7a
 # ╠═d3a2a4c0-7cc9-4b13-a3dd-21db8ce2b847
+# ╠═84520314-605a-4d63-a879-2793ec1501cf
 # ╠═976875c7-fe58-4d28-8421-6027071c9074
 # ╠═28244eab-087b-47c9-ac25-dbb919d4de01
 # ╠═f77659df-b1be-4808-bb12-16d9c35eedcd
 # ╠═00c55a70-1e10-4dcf-a937-20cb0afd77a2
+# ╠═f73074f7-540c-416f-8afa-a8a04ed17a4a
 # ╠═b4236736-e0c8-44da-a450-fb27d6cbdbc8
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
