@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.32
+# v0.19.27
 
 using Markdown
 using InteractiveUtils
@@ -139,23 +139,34 @@ begin
 		#println(im_descompuesta[1])
 		transformada_por_bloques(im_descompuesta)
 		#println(im_descompuesta[1])
-		for i in 1:div(size(im)[1], 8) 
-		for j in 1:div(size(im)[2], 8)
-			vista = view(im_descompuesta[1], 8*(i-1)+1:8*i, 8*(j-1)+1:8*j)
+		n,m = size(im_descompuesta[1])
+		#println((n,m))
+		for i in 1:n÷8 
+		for j in 1:m÷8
+			vista0 = view(im_descompuesta[1], 8*(i-1)+1:8*i, 8*(j-1)+1:8*j)
 			# quiero que se haga por "referencia" la funcion round, no lo probe 
-			vista = round.(Int,vista ./ m_quant)
+			vista0 .= round.(vista0 ./ m_quant, digits=0)
+			#if 8(i-1)+1 ≤ 1001≤ 8i && j==1
+				#println(vista0)
+			#end
 		end
 		end
-		for i in 1:div(size(im_descompuesta[2])[1], 8) 
-		for j in 1:div(size(im_descompuesta[2])[2], 8)
+		for i in 1:div(size(im_descompuesta[2],1), 8) 
+		for j in 1:div(size(im_descompuesta[2],2), 8)
 			# quiero que se haga por "referencia" la funcion round, no lo probe 
-			vista = view(im_descompuesta[2], 8*(i-1)+1:8*i, 8*(j-1)+1:8*j)
-			vista = round.(Int,vista ./ m_quant)
-			vista = view(im_descompuesta[3], 8*(i-1)+1:8*i, 8*(j-1)+1:8*j)
-			vista = round.(Int,vista ./ m_quant)
+			
+			vista1 = view(im_descompuesta[2], 8*(i-1)+1:8*i, 8*(j-1)+1:8*j)
+			vista1 .= round.(vista1 ./ m_quant, digits=0)
+			
+			vista2 = view(im_descompuesta[3], 8*(i-1)+1:8*i, 8*(j-1)+1:8*j)
+			vista2 .= round.(vista2 ./ m_quant, digits=0)
 		end
 		end
-		return im_descompuesta
+		#im_descompuesta[1] .= round.(im_descompuesta[1],digits=0)
+		#im_descompuesta[1] .= convert(Matrix{Int8},im_descompuesta[1])
+		#im_descompuesta[2] .= convert(Matrix{Int8},im_descompuesta[2])
+		#im_descompuesta[3] .= convert(Matrix{Int8},im_descompuesta[3])
+		return [convert(Matrix{Int8},im_descompuesta[1]),convert(Matrix{Int8},im_descompuesta[2]),convert(Matrix{Int8},im_descompuesta[3])]
 	end
 
 	
@@ -177,31 +188,6 @@ begin
 		return im
 	end
 end 
-
-# ╔═╡ 11938dac-e27e-416c-ad79-9def4010774b
-begin 
-	M = []
-	push!(M,[1.123 2.5 3.5 ; 1. 2. 3. ; 1. 2. 3.])
-	push!(M,fill(float64(1),3,3))
-	println(M)
-	M[1] = round.(Int, M[1])
-	#M[2] = round.(Int, M[2])
-	println(M)
-end
-
-# ╔═╡ 36a57a80-3200-48a4-b406-5dce062d65d7
-
-
-# ╔═╡ 922ac8b2-5bb7-4520-aa5b-d8fe353fab3b
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-	#imdes = cuantizar_dct(imagen1)
-	#Intensidad = round.(Int,imdes[1])
-	#print(Intensidad)
-	
-end
-  ╠═╡ =#
 
 # ╔═╡ e198647a-508d-4691-ac23-de8e1e68a745
 md""" Compresion """
@@ -234,18 +220,19 @@ begin
 	end 
 
 	function compresion_matriz(M)
+		n,m = size(M)
 		res = []
 		for i in 1:div(size(M)[1], 8) 
 		for j in 1:div(size(M)[2], 8)
 			vista = view(M, 8*(i-1)+1:8*i, 8*(j-1)+1:8*j)
 			# [valyreps1,valyreps2,....]
 			vals, reps = compresion_bloques_8x8(vista)
-			v = vcat(vals,reps)
+			v = vcat(reps,vals)
 			res = vcat(res,v)
 			# No tenemos control del tamanio de estos Arrays!!
 		end
 		end
-		return res
+		return convert.(Int8,res)
 	end 
 	
 	function inversa_compresion_8x8(M,V)
@@ -277,23 +264,6 @@ begin
 	end
 end 
 
-# ╔═╡ 5b28f474-5c99-4349-bf7c-306865779a89
-O = [
-    1 2 3 4 1 2 3 4;
-    2 3 7 8 5 6 7 8;
-    3 2 3 4 1 2 3 4;
-    5 6 7 8 5 6 7 8;
-    1 2 3 4 1 2 3 4;
-    5 6 7 8 5 6 7 8;
-    1 2 3 4 1 2 3 4;
-    5 6 7 8 5 6 7 8
-]
-
-# ╔═╡ 3a3a875f-44ec-48c3-ae26-a1434252cd75
-begin 
-	compresion_bloques_8x8(O)
-end 
-
 # ╔═╡ b44e45f0-6459-4835-8c99-0c8992555dd8
 md""" Guardado """ 
 
@@ -317,17 +287,50 @@ begin
 		end
 		close(io)
 	end
+	
 	function leer_M(nombre = "Array.ext" ::String)
 		#Solo es una Prueba, no esta bien implementado  
 		io = open(nombre, "r")
-		m = read(io, UInt)
+		n = read(io, Int)
+		m = read(io, Int)
+		println((n,m))
+		# Como no hay control de la cantidad de elementos del array resultante tenemos que ir leyendo cada elemento que sabemos que el primero sera  de repetidos hasta que, la suma parcial sea de 64 
+		Todo = []
+		termino = false
+		suma_parcial = 0 
+		s = 0 
+		reps = []
+		vals = []
+		M = zeros(Int,8,8)
+		#v1 = read(io,UInt)
+		#v2 = read(io,UInt)
+		#println(v1)
+		#println(v2)
+		while(!termino)
+			if suma_parcial == 64 
+				while s != 0 
+					val = read(io,Int8)
+					println(val)
+					push!(vals,val)
+					s -= 1
+				end
+				suma_parcial = 0 
+				println(reps)
+				println(vals)
+				# en este punto ya tenemos los reps y vals 
+				#A = inverse_rle(vals,reps)
+				#inversa_compresion_8x8(M,A)
+				termino = true
+			else 
+				rep = read(io,Int8)
+				println(rep)
+				suma_parcial += rep 
+				push!(reps,rep)
+				s += 1
+			end
+		end
 		close(io)
-		lineas = split(contenido,'\n')
-		luminosidad = parse.(Int, split(lineas[1]))
-		
-		cb = parse.(Int, split(lineas[2]))
-		cr = parse.(Int, split(lineas[3]))
-		return luminosidad
+		#return M
 	end
 end
 
@@ -337,25 +340,59 @@ dependiendo que tipo guardamos, vamos a leerlode una forma u otra, si es un int 
 
 # ╔═╡ da798b8b-4e07-43b9-bd58-e3b79eb67360
 begin 
-	io = open("Array.ext","w")
-	B = [1,2,3,255]
+	io = open("Ej.ext","w")
+	B = compresion_matriz(cuantizar_dct(imagen1)[1])
+	println(B)
 	write(io,1919191)
-	write(io,4)
+	write(io,278520)
 	for a in B
 		write(io,a)
 	end		
 	close(io)
 end
 
+# ╔═╡ 61b5ea08-5f14-4eec-95ce-5df1b4078443
+# ╠═╡ disabled = true
+#=╠═╡
+begin 
+	vector_test = [1,1,1,1,0,0,1,1,0,0,0,0,2,0,0,0,0]
+	vals,reps = rle(vector_test)
+	A1 = inverse_rle(vals,reps)
+	println((vals,reps))
+	println(A1)
+	while(!termino)
+			if suma_parcial == 64 
+				while s != 0 
+					push!(vals,read(io,UInt))
+					s -= 1
+				end
+				suma_parcial = 0 
+				println(reps)
+				println(vals)
+				# en este punto ya tenemos los reps y vals 
+				#A = inverse_rle(vals,reps)
+				#inversa_compresion_8x8(M,A)
+				termino = true
+			else 
+				rep = read(io,UInt)
+				suma_parcial += rep 
+				push!(reps,rep)
+				s += 1
+			end
+		end
+end
+  ╠═╡ =#
+
 # ╔═╡ 6e1ba806-2e5d-4ede-b34d-e6fe1132b8d3
 begin 
-	io2 = open("Array.ext", "r")
+	io2 = open("Ej.ext", "r")
 	t = read(io2,Int)
 	o = read(io2,Int)
 	#println(t)
 	#println(o)
 	for i in 1:o
-		println(read(io2,UInt))
+		valor = read(io2,Int8)
+		println(valor)
 	end
 	close(io2)
 end
@@ -363,28 +400,38 @@ end
 # ╔═╡ 2ec07496-929c-4d7a-8b2e-773348232899
 md""" Juntamos todo """ 
 
+# ╔═╡ 10cca2c5-8bd4-44d1-a926-e372b99ccf7a
+begin 
+	#Primer_Paso(imagen1)
+end 
+
 # ╔═╡ d3a2a4c0-7cc9-4b13-a3dd-21db8ce2b847
 begin 
+	#Compresion final 
 	function Primer_Paso(img)
 		img_descomp = cuantizar_dct(img)
+		n,m = size(img_descomp[1])
 		#Arrays compimidos
 		luminosidad = compresion_matriz(img_descomp[1])
 		cb = compresion_matriz(img_descomp[2])
 		cr = compresion_matriz(img_descomp[3])
-		#obtenemos #bloquesFIlas y #BloquesColumnas ambos de 8x8
-		#M = div(size(img_descomp[1])[1],8)
-		#N = div(size(img_descomp[1])[2],8)
-		guardar_M([luminosidad,cb,cr],1,1)
+		guardar_M([luminosidad,cb,cr],n,m)
 	end
 end
 
-# ╔═╡ b3f15669-3a11-43a3-8033-0d720f07c8f1
-# ╠═╡ skip_as_script = true
-#=╠═╡
+# ╔═╡ 976875c7-fe58-4d28-8421-6027071c9074
 begin 
-	Primer_Paso(imagen1)
+	leer_M()
+end
+
+# ╔═╡ 28244eab-087b-47c9-ac25-dbb919d4de01
+begin 
+	iluminado = compresion_matriz(cuantizar_dct(imagen1)[1])
+	println(iluminado)
 end 
-  ╠═╡ =#
+
+# ╔═╡ f77659df-b1be-4808-bb12-16d9c35eedcd
+typeof(iluminado)
 
 # ╔═╡ 00c55a70-1e10-4dcf-a937-20cb0afd77a2
 begin 
@@ -439,9 +486,9 @@ version = "1.5.0"
 
 [[deps.Adapt]]
 deps = ["LinearAlgebra", "Requires"]
-git-tree-sha1 = "02f731463748db57cc2ebfbd9fbc9ce8280d3433"
+git-tree-sha1 = "76289dc51920fdc6e0013c872ba9551d54961c24"
 uuid = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
-version = "3.7.1"
+version = "3.6.2"
 
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
@@ -454,9 +501,15 @@ version = "0.2.0"
 
 [[deps.ArrayInterface]]
 deps = ["Adapt", "LinearAlgebra", "Requires", "SparseArrays", "SuiteSparse"]
-git-tree-sha1 = "16267cf279190ca7c1b30d020758ced95db89cd0"
+git-tree-sha1 = "f83ec24f76d4c8f525099b2ac475fc098138ec31"
 uuid = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
-version = "7.5.1"
+version = "7.4.11"
+
+[[deps.ArrayInterfaceCore]]
+deps = ["LinearAlgebra", "SnoopPrecompile", "SparseArrays", "SuiteSparse"]
+git-tree-sha1 = "e5f08b5689b1aad068e01751889f2f615c7db36d"
+uuid = "30b0a656-2188-435a-8636-2ec0e6a096e2"
+version = "0.1.29"
 
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
@@ -845,9 +898,9 @@ version = "0.14.7"
 
 [[deps.IntervalSets]]
 deps = ["Dates", "Random", "Statistics"]
-git-tree-sha1 = "3d8866c029dd6b16e69e0d4a939c4dfcb98fac47"
+git-tree-sha1 = "8e59ea773deee525c99a8018409f64f19fb719e6"
 uuid = "8197267c-284f-5f27-9208-e0e47529a953"
-version = "0.7.8"
+version = "0.7.7"
 
 [[deps.InverseFunctions]]
 deps = ["Test"]
@@ -866,10 +919,10 @@ uuid = "c8e1da08-722c-5040-9ed9-7db0dc04731e"
 version = "1.4.0"
 
 [[deps.JLD2]]
-deps = ["FileIO", "MacroTools", "Mmap", "OrderedCollections", "Pkg", "PrecompileTools", "Printf", "Reexport", "Requires", "TranscodingStreams", "UUIDs"]
-git-tree-sha1 = "9bbb5130d3b4fa52846546bca4791ecbdfb52730"
+deps = ["FileIO", "MacroTools", "Mmap", "OrderedCollections", "Pkg", "Printf", "Reexport", "Requires", "TranscodingStreams", "UUIDs"]
+git-tree-sha1 = "572d024660119ee626938419c14db0db5f3f3283"
 uuid = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
-version = "0.4.38"
+version = "0.4.36"
 
 [[deps.JLLWrappers]]
 deps = ["Artifacts", "Preferences"]
@@ -897,9 +950,9 @@ version = "3.0.0+1"
 
 [[deps.LayoutPointers]]
 deps = ["ArrayInterface", "LinearAlgebra", "ManualMemory", "SIMDTypes", "Static", "StaticArrayInterface"]
-git-tree-sha1 = "62edfee3211981241b57ff1cedf4d74d79519277"
+git-tree-sha1 = "88b8f66b604da079a627b6fb2860d3704a6729a1"
 uuid = "10f19ff3-798f-405d-979b-55457f8fc047"
-version = "0.1.15"
+version = "0.1.14"
 
 [[deps.LazyArtifacts]]
 deps = ["Artifacts", "Pkg"]
@@ -949,10 +1002,10 @@ version = "0.3.26"
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 
 [[deps.LoopVectorization]]
-deps = ["ArrayInterface", "CPUSummary", "ChainRulesCore", "CloseOpenIntervals", "DocStringExtensions", "ForwardDiff", "HostCPUFeatures", "IfElse", "LayoutPointers", "LinearAlgebra", "OffsetArrays", "PolyesterWeave", "PrecompileTools", "SIMDTypes", "SLEEFPirates", "SpecialFunctions", "Static", "StaticArrayInterface", "ThreadingUtilities", "UnPack", "VectorizationBase"]
-git-tree-sha1 = "0f5648fbae0d015e3abe5867bca2b362f67a5894"
+deps = ["ArrayInterface", "ArrayInterfaceCore", "CPUSummary", "ChainRulesCore", "CloseOpenIntervals", "DocStringExtensions", "ForwardDiff", "HostCPUFeatures", "IfElse", "LayoutPointers", "LinearAlgebra", "OffsetArrays", "PolyesterWeave", "PrecompileTools", "SIMDTypes", "SLEEFPirates", "SpecialFunctions", "Static", "StaticArrayInterface", "ThreadingUtilities", "UnPack", "VectorizationBase"]
+git-tree-sha1 = "c88a4afe1703d731b1c4fdf4e3c7e77e3b176ea2"
 uuid = "bdcacae8-1622-11e9-2a5c-532679323890"
-version = "0.12.166"
+version = "0.12.165"
 
 [[deps.MKL_jll]]
 deps = ["Artifacts", "IntelOpenMP_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "Pkg"]
@@ -968,9 +1021,9 @@ version = "0.5.11"
 
 [[deps.MakieCore]]
 deps = ["Observables", "REPL"]
-git-tree-sha1 = "9b11acd07f21c4d035bd4156e789532e8ee2cc70"
+git-tree-sha1 = "a94bf3fef9c690a2a4ac1d09d86a59ab89c7f8e4"
 uuid = "20f20a25-4f0e-4fdf-b5d1-57303727442b"
-version = "0.6.9"
+version = "0.6.8"
 
 [[deps.ManualMemory]]
 git-tree-sha1 = "bcaef4fc7a0cfe2cba636d84cda54b5e4e4ca3cd"
@@ -1042,9 +1095,9 @@ version = "1.1.1"
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 
 [[deps.Observables]]
-git-tree-sha1 = "7438a59546cf62428fc9d1bc94729146d37a7225"
+git-tree-sha1 = "6862738f9796b3edc1c09d0890afce4eca9e7e93"
 uuid = "510215fc-4207-5dde-b226-833fc4488ee2"
-version = "0.5.5"
+version = "0.5.4"
 
 [[deps.OffsetArrays]]
 deps = ["Adapt"]
@@ -1207,9 +1260,9 @@ version = "1.3.0"
 
 [[deps.Rotations]]
 deps = ["LinearAlgebra", "Quaternions", "Random", "StaticArrays"]
-git-tree-sha1 = "792d8fd4ad770b6d517a13ebb8dadfcac79405b8"
+git-tree-sha1 = "0783924e4a332493f72490253ba4e668aeba1d73"
 uuid = "6038ab10-8711-5258-84ad-4b1120ba62dc"
-version = "1.6.1"
+version = "1.6.0"
 
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
@@ -1221,9 +1274,9 @@ version = "0.1.0"
 
 [[deps.SLEEFPirates]]
 deps = ["IfElse", "Static", "VectorizationBase"]
-git-tree-sha1 = "3aac6d68c5e57449f5b9b865c9ba50ac2970c4cf"
+git-tree-sha1 = "4b8586aece42bee682399c4c4aee95446aa5cd19"
 uuid = "476501e8-09a2-5ece-8869-fb82de89a1fa"
-version = "0.6.42"
+version = "0.6.39"
 
 [[deps.Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
@@ -1249,6 +1302,12 @@ deps = ["Dates", "FileIO", "ImageCore", "IndirectArrays", "OffsetArrays", "REPL"
 git-tree-sha1 = "2da10356e31327c7096832eb9cd86307a50b1eb6"
 uuid = "45858cf5-a6b0-47a3-bbea-62219f50df47"
 version = "0.1.3"
+
+[[deps.SnoopPrecompile]]
+deps = ["Preferences"]
+git-tree-sha1 = "e760a70afdcd461cf01a575947738d359234665c"
+uuid = "66db9d55-30c0-4569-8b51-7e840670fc0c"
+version = "1.0.3"
 
 [[deps.Sockets]]
 uuid = "6462fe0b-24de-5631-8697-dd941f90decc"
@@ -1356,9 +1415,9 @@ version = "0.5.0"
 
 [[deps.TranscodingStreams]]
 deps = ["Random", "Test"]
-git-tree-sha1 = "1fbeaaca45801b4ba17c251dd8603ef24801dd84"
+git-tree-sha1 = "7c9196c8c83802d7b8ca7a6551a0236edd3bf731"
 uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
-version = "0.10.2"
+version = "0.10.0"
 
 [[deps.UUIDs]]
 deps = ["Random", "SHA"]
@@ -1421,7 +1480,7 @@ uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 
 # ╔═╡ Cell order:
 # ╠═232f7092-7e35-11ee-3548-13d1e42085fa
-# ╟─4752cb3e-e050-4573-b030-8b8ddc0840ed
+# ╠═4752cb3e-e050-4573-b030-8b8ddc0840ed
 # ╠═1338eb76-a58a-42a7-a429-9b7cfc148164
 # ╠═471848d0-0e1a-442d-b2dc-b68e5f0090cc
 # ╠═81f9e18f-8463-4e9d-ab10-ea0863415bdc
@@ -1431,21 +1490,20 @@ uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 # ╠═4d96c454-fbfe-4500-80b4-97e8a9df671a
 # ╟─c8f89fe3-02df-45b3-a56d-2bb651b83901
 # ╠═6e32d7ab-ba46-4a4e-8ed1-a8f0d1a635e8
-# ╠═11938dac-e27e-416c-ad79-9def4010774b
-# ╠═36a57a80-3200-48a4-b406-5dce062d65d7
-# ╠═922ac8b2-5bb7-4520-aa5b-d8fe353fab3b
 # ╟─e198647a-508d-4691-ac23-de8e1e68a745
 # ╠═0da373e1-bddf-4fb4-b7fa-825fe0cc584c
-# ╠═5b28f474-5c99-4349-bf7c-306865779a89
-# ╠═3a3a875f-44ec-48c3-ae26-a1434252cd75
 # ╟─b44e45f0-6459-4835-8c99-0c8992555dd8
 # ╠═2867346e-3d11-4206-9363-f7568c9f7404
+# ╠═61b5ea08-5f14-4eec-95ce-5df1b4078443
 # ╟─47906cab-9184-4af2-81c2-2951524c03ae
 # ╠═da798b8b-4e07-43b9-bd58-e3b79eb67360
 # ╠═6e1ba806-2e5d-4ede-b34d-e6fe1132b8d3
 # ╟─2ec07496-929c-4d7a-8b2e-773348232899
+# ╠═10cca2c5-8bd4-44d1-a926-e372b99ccf7a
 # ╠═d3a2a4c0-7cc9-4b13-a3dd-21db8ce2b847
-# ╠═b3f15669-3a11-43a3-8033-0d720f07c8f1
+# ╠═976875c7-fe58-4d28-8421-6027071c9074
+# ╠═28244eab-087b-47c9-ac25-dbb919d4de01
+# ╠═f77659df-b1be-4808-bb12-16d9c35eedcd
 # ╠═00c55a70-1e10-4dcf-a937-20cb0afd77a2
 # ╠═b4236736-e0c8-44da-a450-fb27d6cbdbc8
 # ╟─00000000-0000-0000-0000-000000000001
