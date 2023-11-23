@@ -56,31 +56,32 @@ end
 
 # ╔═╡ f065f737-0392-470e-aa5d-39353627dc11
 function descomponer_inversa(im)
-a=im[1]
-b=im[2]
-c=im[3]
-nueva_im_b = fill(Float64(0), size(b)[1]*2, size(b)[2]*2)
-nueva_im_c = fill(Float64(0), size(b)[1]*2, size(b)[2]*2)
-
-for i in 1:(size(b)[1])
-for j in 1:(size(b)[2])
-	nueva_im_b[2*i-1,2*j-1]= b[i, j]+Float64(128)
-	nueva_im_b[2*i-1,2*j]= b[i, j]+Float64(128)
-	nueva_im_b[2*i,2*j-1]= b[i, j]+Float64(128)
-	nueva_im_b[2*i,2*j]= b[i, j]+Float64(128)
-	nueva_im_c[2*i-1,2*j-1]= c[i, j]+Float64(128)
-	nueva_im_c[2*i-1,2*j]= c[i, j]+Float64(128)
-	nueva_im_c[2*i,2*j-1]= c[i, j]+Float64(128)
-	nueva_im_c[2*i,2*j]= c[i, j]+Float64(128)
-end
-end
-nueva_im_a=a.+Float64(128)
-nueva= fill(Float64(0), 3, size(nueva_im_a)[1], size(nueva_im_a)[2])
-nueva[1,:, :]=nueva_im_a
-nueva[2,:, :]=nueva_im_b
-nueva[3,:, :]=nueva_im_c
-res=colorview(YCbCr, nueva)
-return res
+	a=im[1]
+	b=im[2]
+	c=im[3]
+	nueva_im_b = fill(Float64(0), size(b,1)*2, size(b,2)*2)
+	nueva_im_c = fill(Float64(0), size(b,1)*2, size(b,2)*2)
+	
+	for i in 1:size(b,1)
+	for j in 1:size(b,2)
+		nueva_im_b[2*i-1,2*j-1]= b[i, j]+Float64(128)
+		nueva_im_b[2*i-1,2*j]= b[i, j]+Float64(128)
+		nueva_im_b[2*i,2*j-1]= b[i, j]+Float64(128)
+		nueva_im_b[2*i,2*j]= b[i, j]+Float64(128)
+		
+		nueva_im_c[2*i-1,2*j-1]= c[i, j]+Float64(128)
+		nueva_im_c[2*i-1,2*j]= c[i, j]+Float64(128)
+		nueva_im_c[2*i,2*j-1]= c[i, j]+Float64(128)
+		nueva_im_c[2*i,2*j]= c[i, j]+Float64(128)
+	end
+	end
+	nueva_im_a = a .+ Float64(128)
+	nueva= fill(Float64(0), 3, size(nueva_im_a)[1], size(nueva_im_a)[2])
+	nueva[1,:, :] = nueva_im_a
+	nueva[2,:, :] = nueva_im_b
+	nueva[3,:, :] = nueva_im_c
+	res = colorview(YCbCr, nueva)
+	return res
 end
 
 # ╔═╡ 5540d711-3295-442c-ba17-706ca1ed1848
@@ -173,18 +174,20 @@ begin
 		for i in 1:div(size(im)[1], 8) 
 		for j in 1:div(size(im)[2], 8)
 			vista = view(im[1], 8*(i-1)+1:8*i, 8*(j-1)+1:8*j)
-			round.(vista .* m_quant)
+			vista .= round.(vista .* m_quant)
 		end
 		end
+		
 		for i in 1:div(size(im[2])[1], 8) 
 		for j in 1:div(size(im[2])[2], 8)
 			vista1 = view(im[2], 8*(i-1)+1:8*i, 8*(j-1)+1:8*j)
-			round.(vista1 .* m_quant)
+			vista1 .= round.(vista1 .* m_quant)
 			vista2 = view(im[3], 8*(i-1)+1:8*i, 8*(j-1)+1:8*j)
-			round.(vista2 .* m_quant)
+			vista2 .= round.(vista2 .* m_quant)
 		end
 		end
 		inversa_transformada_por_bloques(im)
+		#return im 
 	end
 end 
 
@@ -304,7 +307,7 @@ begin
 		bloq_cols = m ÷ 8
 		bloq_cols2 = bloq_cols ÷ 2
 		bloq_fils2 = bloq_fils ÷ 2
-		println((n,m))
+		#println((n,m))
 		# Como no hay control de la cantidad de elementos del array resultante tenemos que ir leyendo cada elemento que sabemos que el primero sera  de repetidos hasta que, la suma parcial sea de 64 
 		i = 1 
 		j = 1 
@@ -465,7 +468,7 @@ begin
 	function Primer_Paso(img)
 		img_descomp = cuantizar_dct(img)
 		n,m = size(img_descomp[1])
-		println((n,m))
+		#println((n,m))
 		#Arrays compimidos
 		luminosidad = compresion_matriz(img_descomp[1])
 		cb = compresion_matriz(img_descomp[2])
@@ -491,10 +494,14 @@ begin
 	img1 = Segundo_paso()
 end
 
+# ╔═╡ 25084ca7-c1be-4e8e-ae1c-9db67d641079
+descomponer_inversa(descomponer(imagen1))
+
 # ╔═╡ 28244eab-087b-47c9-ac25-dbb919d4de01
 begin 
 	#lu = cuantizar_dct(imagen1)[3]
-	img1
+	#img1
+	#descomponer_inversa(img1)
 end 
 
 # ╔═╡ 00c55a70-1e10-4dcf-a937-20cb0afd77a2
@@ -502,7 +509,7 @@ begin
 	#M[1] == lu[1]
 	#argmin(M[3] - lu)
 	#M[3] == lu[3]
-	lu == M[3]
+	#lu == M[3]
 end
 
 # ╔═╡ 10acb9b8-6fb5-4b17-8194-0713d7f2c73f
@@ -1754,6 +1761,7 @@ version = "17.4.0+0"
 # ╠═d3a2a4c0-7cc9-4b13-a3dd-21db8ce2b847
 # ╠═84520314-605a-4d63-a879-2793ec1501cf
 # ╠═976875c7-fe58-4d28-8421-6027071c9074
+# ╠═25084ca7-c1be-4e8e-ae1c-9db67d641079
 # ╠═28244eab-087b-47c9-ac25-dbb919d4de01
 # ╠═f77659df-b1be-4808-bb12-16d9c35eedcd
 # ╠═00c55a70-1e10-4dcf-a937-20cb0afd77a2
